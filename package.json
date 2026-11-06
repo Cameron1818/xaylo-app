@@ -1,0 +1,38 @@
+{
+  "name": "xaylo-ghl-marketplace",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npm run build:web && node --env-file=.env --watch --import tsx src/server.ts",
+    "build:web": "vite build --config web/vite.config.js",
+    "build": "tsc -p tsconfig.json && mkdir -p dist/public && cp src/public/tracker.js src/public/xaylo-logo.png src/public/guide.html dist/public/ && npm run build:web",
+    "start": "node dist/server.js",
+    "db:migrate": "node --env-file=.env --import tsx src/db/migrate.ts",
+    "db:seed-preview": "node --env-file=.env --import tsx src/db/seed-preview.ts",
+    "test": "node --import tsx --test test/*.test.ts",
+    "check": "npm run build && npm test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@fastify/rate-limit": "^10.2.1",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "crypto-js": "^4.2.0",
+    "fastify": "^5.3.2",
+    "pg": "^8.14.1",
+    "stripe": "^23.1.0",
+    "vue": "^3.4.21",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/crypto-js": "^4.2.2",
+    "@types/node": "^22.14.1",
+    "@types/pg": "^8.11.13",
+    "@vitejs/plugin-vue": "^5.1.4",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3",
+    "vite": "^6.0.0"
+  }
+}

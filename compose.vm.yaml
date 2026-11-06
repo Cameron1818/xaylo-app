@@ -1,0 +1,89 @@
+name: xaylo
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: xaylo
+      POSTGRES_DB: xaylo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.vm}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U xaylo -d xaylo"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - database
+
+  app:
+    build: .
+    image: xaylo-app:vm
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DEV_PREVIEW: "false"
+      PORT: "3000"
+      PUBLIC_BASE_URL: https://${APP_DOMAIN:?Set APP_DOMAIN in .env.vm}
+      DATABASE_URL: postgres://xaylo:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.vm}@db:5432/xaylo
+      GHL_CLIENT_ID: ${GHL_CLIENT_ID:-}
+      GHL_CLIENT_SECRET: ${GHL_CLIENT_SECRET:-}
+      GHL_SHARED_SECRET: ${GHL_SHARED_SECRET:-}
+      GHL_APP_ID: ${GHL_APP_ID:-}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?Set ENCRYPTION_KEY in .env.vm}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env.vm}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT:-}
+      GOOGLE_ADS_API_VERSION: ${GOOGLE_ADS_API_VERSION:-v26}
+      GOOGLE_ADS_DEVELOPER_TOKEN: ${GOOGLE_ADS_DEVELOPER_TOKEN:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-}
+      REPORT_SOURCE_MAX_PAGES: ${REPORT_SOURCE_MAX_PAGES:-20}
+      FREE_TRIAL_DAYS: ${FREE_TRIAL_DAYS:-7}
+      FREE_REPORT_LOOKBACK_DAYS: ${FREE_REPORT_LOOKBACK_DAYS:-7}
+      PAID_REPORTS_PER_MONTH: ${PAID_REPORTS_PER_MONTH:-30}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_PRICE_ID: ${STRIPE_PRICE_ID:-}
+    expose:
+      - "3000"
+    networks:
+      - database
+      - web
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in .env.vm}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - web
+
+networks:
+  database:
+    internal: true
+  web:
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

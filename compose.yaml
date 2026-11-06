@@ -1,0 +1,13 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: xaylo
+      POSTGRES_PASSWORD: xaylo
+      POSTGRES_DB: xaylo
+    ports:
+      - "5432:5432"
+    volumes:
+      - xaylo_pg:/var/lib/postgresql/data
+volumes:
+  xaylo_pg:

@@ -1,0 +1,12 @@
+node_modules
+dist
+web/dist
+.env
+.env.vm
+.env.*
+*.log
+*.dump
+*.pem
+*.key
+.git
+coverage

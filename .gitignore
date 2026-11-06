@@ -1,0 +1,14 @@
+node_modules/
+dist/
+web/dist/
+.env
+.env.vm
+.env.*
+!.env.example
+!.env.vm.example
+*.log
+*.dump
+*.pem
+*.key
+.DS_Store
+coverage/

@@ -1,0 +1,15 @@
+<script setup>
+import { ref, onMounted } from 'vue'
+const props = defineProps({ api: { type: Function, required: true } })
+const access = ref(null), error = ref(''), busy = ref(false), destination = ref('')
+async function load() { try { access.value = await props.api('/api/billing') } catch (cause) { error.value = cause.message } }
+async function checkout(portal = false) {
+  busy.value = true; error.value = ''
+  try { destination.value = (await props.api(portal ? '/api/billing/portal' : '/api/billing/checkout', { method: 'POST' })).url }
+  catch (cause) { error.value = cause.message }
+  finally { busy.value = false }
+}
+onMounted(load)
+</script>
+<template><section class="billing"><span class="eyebrow">YOUR PLAN</span><h1>Reports & subscription</h1><p>Your website and CRM connections belong to this workspace. Its reporting allowance applies equally in the dashboard and connected AI assistants.</p><p v-if="error" class="error" role="alert">{{ error }}</p><div v-if="access" class="panel"><h2>{{ access.paid ? 'Subscribed' : 'Free access' }}</h2><template v-if="!access.paid"><p v-if="access.trialExpiresAt">{{ access.trialActive ? 'Your trial ends' : 'Your trial ended' }} {{ new Date(access.trialExpiresAt).toLocaleString() }}.</p><p>One free AI report total, analysing up to {{ access.maxLookbackDays }} days of data. Subscribe to generate additional reports or continue analysis after the trial.</p></template><p v-else>Up to {{ access.limit }} AI reports per calendar month and {{ access.maxLookbackDays }} days of analysis.</p><strong>{{ access.reportsRemaining }} {{ access.paid ? 'reports remaining this month' : 'free reports remaining' }}</strong><p>Failed generations do not use your allowance. Deleting a saved report does not restore it. Your saved reports remain readable after your trial or subscription ends.</p><div class="actions"><button v-if="!access.paid" :disabled="busy || !access.checkoutConfigured" @click="checkout()">Subscribe</button><button v-if="access.hasBillingAccount" :disabled="busy" @click="checkout(true)">Manage subscription</button><button :disabled="busy" @click="load">Refresh subscription status</button></div><p v-if="!access.checkoutConfigured && !access.paid">Subscriptions are not configured for this installation yet.</p><p v-if="destination"><a :href="destination" target="_blank" rel="noopener noreferrer">Continue to secure billing ↗</a></p><p>Checkout shows your subscription price and billing interval before you pay. Return here and refresh after checkout to confirm activation.</p></div></section></template>
+<style scoped>.billing{max-width:850px}.eyebrow{font-size:11px;letter-spacing:.15em;color:#e8b923}h1{font-size:36px}.panel{padding:28px;border:1px solid #303144;border-radius:14px;background:#171827}p{line-height:1.7;color:#b8bdd0}strong{font-size:22px}.actions{display:flex;flex-wrap:wrap;gap:10px;margin:22px 0}button{padding:11px 15px;background:#e8b923;color:#111;border:0;border-radius:8px;font-weight:700;cursor:pointer}button:disabled{opacity:.5;cursor:default}a{color:#e8d17e}.error{color:#ffc6cc}</style>
