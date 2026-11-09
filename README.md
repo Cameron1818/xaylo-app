@@ -20,8 +20,8 @@ Xaylo reads GHL and Google Ads on demand and retains its own tracking data and r
 | `src/security` | Token encryption, signed contact links, webhook verification |
 | `src/db`, `migrations` | PostgreSQL connection and schema |
 | `src/public` | Website tracker |
-| `src/traffic` | Location-scoped visit aggregation for the dartboard |
-| `web` | Vue dashboard and adapted dartboard source |
+| `src/traffic` | Location-scoped visit aggregation for the journey map |
+| `web` | Vue dashboard and visitor journey visualisation |
 | `test` | Matching and security checks |
 
 ## Local setup
@@ -70,7 +70,7 @@ The callback saves encrypted, rotating OAuth tokens. The embedded page requests 
 
 To bind an existing GHL contact to a visitor, send `POST /api/contact-links` with `{ "contactId": "..." }` and the admin session bearer token. The response contains a 30-day signed `contactToken`; set it as `data-contact-token` on the tracker script or call `window.Xaylo.setContactToken(token)`. Contact existence and location ownership are checked through GHL. Use this from a trusted server or a protected automation endpoint, never expose the admin session token in public page code.
 
-The Overview dartboard groups page views into sessions with a 30-minute inactivity boundary, keeps return visits, and counts a conversion once per session. It uses `GET /api/traffic?days=30` (also 7 or 90) for the signed-in location. Page labels omit query strings; UTM values remain separate tracking properties. Existing events without a session ID are grouped by visitor and inactivity. Hover a session journey to trace its route, or click to keep it selected; clicking another switches selection and clicking the selected journey again clears it. The local demo includes 220 sessions with loops and five roads carrying traffic in both directions.
+The Overview journey map groups page views into sessions with a 30-minute inactivity boundary, keeps return visits, and counts a conversion once per session. Gold/orange lines show main routes toward conversion, purple lines show alternative and return routes, and muted dashed lines show branches without an observed route to conversion. Arrows follow travel direction and thicker lines carry more sessions. Page positions stay fixed when filtering. It uses `GET /api/traffic?days=30` (also 7 or 90) for the signed-in location. Page labels omit query strings; UTM values remain separate tracking properties. Existing events without a session ID are grouped by visitor and inactivity. Hover or focus a page or line for its counts. Hover a session journey to trace its route, or click to keep it selected; clicking another switches selection and clicking the selected journey again clears it. The local demo includes 220 sessions with loops and five roads carrying traffic in both directions.
 
 ## Validation and release limits
 

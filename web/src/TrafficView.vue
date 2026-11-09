@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useTrafficData } from './composables/useTrafficData'
-import Dartboard from './components/Dartboard.vue'
+import JourneyMap from './components/JourneyMap.vue'
 import PathList from './components/PathList.vue'
 import Filters from './components/Filters.vue'
 import Tooltip from './components/Tooltip.vue'
@@ -27,10 +27,9 @@ const {
   funnelStages,
   showReturnTraffic,
   journeyType,
-  maxRing,
-  center,
-  bullRadius,
-  ringRadius,
+  mapWidth,
+  mapHeight,
+  goalPosition,
   highlightForNode,
   highlightForPathKey,
   highlightForPathKeys,
@@ -172,31 +171,33 @@ const topPage = computed(() => [...nodes.value].sort((a, b) => b.weight - a.weig
 
     <main class="app-main">
       <div class="board-wrap">
+        <div class="map-heading"><div><h2>Visitor journeys</h2><p>Follow the paths from your website pages to conversion.</p></div></div>
         <div class="board-legend">
-          <span><i class="road-key"></i> Two-way road</span>
+          <span><i class="primary-key"></i> Main routes</span>
+          <span><i class="alternative-key"></i> Alternative & return routes</span>
           <span><b class="direction-key">→</b> Travel direction</span>
           <span v-if="!showReturnTraffic">First visits only</span>
           <span><i class="exit-key"></i> Exit branch</span>
         </div>
-        <Dartboard
+        <JourneyMap
           :nodes="nodes"
           :edges="edges"
           :roads="roads"
           :goal="goal"
           :converted-sessions="convertedSessions"
-          :center="center"
-          :bull-radius="bullRadius"
-          :max-ring="maxRing"
-          :ring-radius="ringRadius"
+          :goal-position="goalPosition"
+          :map-width="mapWidth"
+          :map-height="mapHeight"
           :highlight-set="activeHighlight"
           :center-hovered="centerHovered"
+          @pointer-position="onMouseMove"
           @hover-node="onHoverNode"
           @leave="onLeave"
           @hover-edge="onHoverEdge"
           @hover-center="onHoverCenter"
           @leave-center="onLeaveCenter"
         />
-        <p class="board-caption">{{ visibleSessions.toLocaleString() }} of {{ totalSessions.toLocaleString() }} sessions shown · {{ topPaths.length }} journeys. Wider carriageways carry more sessions. Paired lanes travel in opposite directions; hover a lane for first visits and revisits.{{ showReturnTraffic ? '' : ' Revisit traffic is hidden; session totals are unchanged.' }}</p>
+        <p class="board-caption">{{ visibleSessions.toLocaleString() }} of {{ totalSessions.toLocaleString() }} sessions shown · {{ topPaths.length }} journeys. Thicker lines carry more sessions. Gold/orange lines show main routes; purple lines show alternative and return routes. Moving dots show travel direction, not live visitors. Hover a line to see first visits and revisits.{{ showReturnTraffic ? '' : ' Revisit traffic is hidden; session totals are unchanged.' }}</p>
       </div>
 
       <PathList
@@ -290,15 +291,14 @@ const topPage = computed(() => [...nodes.value].sort((a, b) => b.weight - a.weig
 }
 
 .app-main {
-  display: flex;
-  gap: 32px;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
 }
 
 .board-wrap {
-  flex: 1 1 480px;
+  gap: 16px;
   display: flex;
   justify-content: center;
   min-width: 0;
@@ -322,10 +322,14 @@ const topPage = computed(() => [...nodes.value].sort((a, b) => b.weight - a.weig
 .reach-track { height: 5px; border-radius: 5px; background: #2a2a42; overflow: hidden; }
 .reach-track div { height: 100%; background: #e8b923; border-radius: inherit; }
 .funnel-summary p { flex-basis: 100%; margin: 0; font-size: 12px; color: #9aa0c3; }
-.board-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 18px; font-size: 12px; color: #b9bedb; }
+.board-legend { width:100%; display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 18px; font-size: 12px; color: #b9bedb; }
 .board-legend i { display: inline-block; width: 18px; height: 4px; border-radius: 4px; vertical-align: middle; margin-right: 5px; }
-.board-legend .road-key { height: 9px; border-top: 3px solid #79b9b1; border-bottom: 3px solid #79b9b1; border-radius: 0; }
+.board-legend .primary-key { background: linear-gradient(90deg, #b78037, #f1c44d); }
+.board-legend .alternative-key { background: linear-gradient(90deg, #8170bd, #b7a2ed); }
+.map-heading { width:100%; }
+.map-heading h2 { margin:0 0 7px; font-size:18px; font-weight:600; color:#e1e4ed; }
+.map-heading p { margin:0; font-size:12px; color:#8d98ad; }
 .direction-key { color: #fff6d8; margin-right: 5px; }
-.exit-key { background: #8593b3; }
-.board-caption { max-width: 640px; color: #9aa0c3; font-size: 12px; line-height: 1.6; text-align: center; }
+.exit-key { background: repeating-linear-gradient(90deg, #7b879e 0 4px, transparent 4px 7px); }
+.board-caption { max-width: 850px; margin:0; color: #9aa0c3; font-size: 12px; line-height: 1.6; text-align: center; }
 </style>

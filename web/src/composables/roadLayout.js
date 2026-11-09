@@ -25,7 +25,7 @@ function pathData(points) {
 
 // Both directions derive from one curve, offset along its local normal.
 // Reversing the samples gives arrows and particles the real travel direction.
-export function buildRoadLayout(flows, positions, center) {
+export function buildRoadLayout(flows, positions, center, direction = 'radial') {
   const groups = new Map()
   const maxWeight = Math.max(1, ...flows.map((e) => e.weight))
   for (const flow of flows) {
@@ -46,6 +46,10 @@ export function buildRoadLayout(flows, positions, center) {
     let controls
     if (group[0].from === group[0].to) {
       controls = [from, { x: from.x - 58, y: from.y - 80 }, { x: from.x + 58, y: from.y - 80 }, to]
+    } else if (direction === 'horizontal') {
+      controls = Math.abs(dx) < 40
+        ? [from, { x: from.x + 65, y: from.y }, { x: to.x + 65, y: to.y }, to]
+        : [from, { x: from.x + dx * 0.45, y: from.y }, { x: to.x - dx * 0.45, y: to.y }, to]
     } else if (from.ring === to.ring) {
       controls = [from,
         { x: from.x + dx / 3 - dy / length * 28, y: from.y + dy / 3 + dx / length * 28 },

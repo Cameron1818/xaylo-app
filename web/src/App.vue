@@ -125,7 +125,7 @@ onMounted(() => { connect().catch(cause => { status.value = 'Connection failed';
           <p v-if="isPreview && totalSessions" class="preview-note">Local test data · {{ totalSessions.toLocaleString() }} visitor journeys</p>
           <div class="metrics"><div class="metric"><span>Sessions</span><strong>{{ totalSessions.toLocaleString() }}</strong></div><div class="metric"><span>Conversions</span><strong>{{ conversions.toLocaleString() }}</strong></div><div class="metric"><span>Conversion rate</span><strong>{{ totalSessions ? (conversions / totalSessions * 100).toFixed(1) : '0.0' }}%</strong></div><div class="metric"><span>Published journeys</span><strong>{{ journeys.filter(j => j.status === 'published').length }}</strong></div></div>
           <div v-if="traffic && totalSessions" class="board-card"><TrafficView :key="days" :traffic="traffic" /></div>
-          <div v-else class="empty"><strong>Your traffic dartboard is ready.</strong><p>Add the tracker to your website to see real visits and conversions here.</p><button @click="tab = 'Tracking'">Set up tracking</button></div>
+          <div v-else class="empty"><strong>Your visitor journey map is ready.</strong><p>Add the tracker to your website to see real visits and conversions here.</p><button @click="tab = 'Tracking'">Set up tracking</button></div>
         </section>
         <section v-else-if="tab === 'Reports'"><Reports :api="api" @subscribe="tab = 'Billing'" /></section>
         <section v-else-if="tab === 'Billing'"><Billing :api="api" /></section>

@@ -61,7 +61,7 @@ const emit = defineEmits(['hover', 'leave', 'select'])
   border-radius: 14px;
   padding: 18px 18px 8px;
   width: 100%;
-  max-width: 380px;
+  min-width: 0;
   backdrop-filter: blur(6px);
 }
 
@@ -80,10 +80,10 @@ const emit = defineEmits(['hover', 'leave', 'select'])
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-height: 480px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 310px), 1fr));
+  gap: 8px;
+  max-height: 360px;
   overflow-y: auto;
 }
 
@@ -126,7 +126,8 @@ const emit = defineEmits(['hover', 'leave', 'select'])
   gap: 3px;
   color: #eef0ff;
   font-weight: 600;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 .step-icon {
   font-size: 13px;
