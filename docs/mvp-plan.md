@@ -22,7 +22,7 @@ Open questions and risks are in [docs/mvp-issues.md](mvp-issues.md); issue numbe
 | Google Ads | **Read operations only**, enforced by Xaylo. The advertiser's only setup is one click on **Connect Google Ads** and approving Google's consent screen. If Google requires them to approve again, reports pause until they reconnect. |
 | GHL | Read-only reporting with the existing scopes. Tag writes remain limited to the existing journey conversion feature. |
 | MCP | Understands Xaylo Journeys, routes, UTM sources and how Google Ads traffic links to them, with a focus on conversions and clicks. Read-only tools for Ads and GHL. |
-| AI | The workspace chooses a provider: **Xaylo AI** (included, using Xaylo's own key and a low-cost model), **OpenAI (your key)** or **Claude (your key)**. Each report reads the whole cleaned data pool and returns **one action**. |
+| AI | **Xaylo AI** only: Xaylo's own key and a high-quality model (`claude-opus-5-5`). There is no provider setting and no customer key. Each report reads the whole cleaned data pool and returns **one action**. |
 | Cadence | At most one report every 7 days. Each new report opens with the measured result of the previous action. |
 
 ## Step overview
@@ -35,7 +35,7 @@ Open questions and risks are in [docs/mvp-issues.md](mvp-issues.md); issue numbe
 | 4 | Linking Ads traffic to sessions, routes and Xaylo Journeys | 3 | M |
 | 5 | Cleaned data pool | 4 | M |
 | 6 | MCP tools for journeys, routes, sources, Ads and GHL | 5 | S |
-| 7 | AI provider choice: Xaylo AI, OpenAI or Claude | none (can run alongside 1–6) | M |
+| 7 | Xaylo AI report engine | none (can run alongside 1–6) | S–M |
 | 8 | Weekly single-action report, trial and plan rules | 5, 7 | M |
 | 9 | Results of the last change | 8 | S–M |
 | 10 | Rings view and the route map | none (can run alongside 1–9) | M |
@@ -148,7 +148,7 @@ New module `src/traffic/adsAssociation.ts`. Its output, per campaign: `{ campaig
 
 ## Step 5: Cleaned data pool
 
-**Goal:** One deterministic, bounded dataset used by the dashboard, the MCP tools and every AI provider.
+**Goal:** One deterministic, bounded dataset used by the dashboard, the MCP tools and Xaylo AI.
 
 `src/reporting/dataPool.ts` → `buildDataPool(locationId, period)` returns:
 
@@ -180,7 +180,7 @@ Every tool here is read-only (`readOnlyHint: true`) and needs the `reports:read`
 | `get_ads_traffic_association` | `customerId`, `days` → the Step 4 output. |
 | `get_data_pool` | `days`, optional `customerId` → the full Step 5 dataset. |
 | `get_current_action` | The current action, its status, and its result once measured. |
-| `get_ai_status` | The chosen provider, model, whether it is ready, and the next report date. |
+| `get_ai_status` | Whether Xaylo AI is ready, and the next report date. |
 
 The existing tools stay; `get_crm_summary` remains the GHL read tool. Update the server's MCP `instructions` text with the suggested order: `get_connected_accounts` → `get_data_pool` → drill down. Update `docs/reporting.md`.
 
@@ -188,28 +188,24 @@ The existing tools stay; `get_crm_summary` remains the GHL read tool. Update the
 
 ---
 
-## Step 7: AI provider choice: Xaylo AI, OpenAI or Claude
+## Step 7: Xaylo AI report engine
 
-**Goal:** The workspace chooses who runs its weekly report. Xaylo AI is the default and needs no setup.
+**Goal:** Every report runs on Xaylo AI: Xaylo's own Anthropic key and a high-quality model, so each report is solid enough to act on. Users never see a provider setting or handle an API key.
 
-| Option (UI label) | Key | Model | Notes |
-| --- | --- | --- | --- |
-| **Xaylo AI** (default, included) | Xaylo's server key (`XAYLO_AI_API_KEY`) | A low-cost model: `claude-haiku-5-5` ($0.10 / $0.50 per million input/output tokens) | About $0.01 per report at the expected size of 20–30k input tokens. Can be switched to `claude-sonnet-5-5` for paid plans if testing shows better quality. |
-| **OpenAI (your key)** | The workspace's own OpenAI key | Chosen from an allowlist; defaults to the current `AI_MODEL` | Reuses the existing Responses API code in `src/reporting/ai.ts`. |
-| **Claude (your key)** | The workspace's own Anthropic key | Chosen from an allowlist (`claude-opus-5-5` by default, `claude-sonnet-5-5`, `claude-haiku-5-5`) | Official `@anthropic-ai/sdk`, with structured outputs through `output_config.format` and a server-side refusal fallback. |
+- **Model:** `claude-opus-5-5`, with adaptive thinking and `output_config.effort: 'high'`. The model is a server setting (`XAYLO_AI_MODEL`), not a user option.
+- **Cost:** a report with about 25k input tokens and up to 15k output tokens (including thinking) costs roughly $0.10 + $0.30 = **$0.40, about £0.32**. At one report a week that is under £1.50 a month per workspace, about 3% of the £49 Insights price.
+- **Implementation:** replace the OpenAI Responses call in `src/reporting/ai.ts` with the official `@anthropic-ai/sdk`:
+  - `client.messages.stream({...}).finalMessage()`, because a long thinking turn can run past a non-streaming timeout.
+  - Structured outputs through `output_config.format` (JSON schema), then the existing Zod validation and evidence-ID check.
+  - Server-side refusal fallbacks (`fallbacks: "default"`), with `stop_reason` checked for `refusal` and `max_tokens` and a clear 502 for each.
+  - Prompt caching on the fixed system prompt.
+- **Config:** `ANTHROPIC_API_KEY` and `XAYLO_AI_MODEL` replace `OPENAI_API_KEY` and `AI_MODEL`. Remove the OpenAI code path and its environment variables (**I-4**).
+- **Quality gate before launch:** a small evaluation set (10–20 anonymised data pools from staging or preview data) that checks for exactly one action, valid evidence IDs, a measurable metric, and no spend increase recommended on sparse data. Run it whenever the prompt version changes.
+- **MCP:** `get_ai_status` returns `{ ready, nextReportAt }` only. No key or provider is exposed or accepted through MCP.
+- Report provenance records the prompt version and the model.
 
-See **I-4** for why the labels name the provider rather than products such as "ChatGPT" or a specific model name.
-
-- **Provider interface** `src/reporting/providers/{index,xaylo,openai,anthropic}.ts`, each with `generate(input, schema) → analysis`. The shared Zod validation and evidence-ID check run after every provider. The output schema is the same for all of them.
-- **Keys:** migration `007_ai_settings.sql` adds `ai_settings(location_id PK, provider, model, api_key_enc, last4, validated_at)`.
-  - `PUT /api/ai/settings` validates a workspace's own key with a cheap model-list call, then stores it encrypted. `GET /api/ai/settings` never returns the key.
-  - Keys are entered only in the dashboard and **never through MCP**. The MCP tool `get_ai_status` returns only the provider and its status.
-- **UI:** an "AI provider" panel in Connections with three cards. Selecting OpenAI or Claude shows a password-type key field and a **Test & save** button.
-- **Failure handling:** if a workspace key fails (invalid key, out of credit or rate limited), the report is not consumed, and the user sees "Your OpenAI key was rejected — update it or switch to Xaylo AI".
-- The weekly cadence and plan rules apply whichever provider is chosen. Report provenance records the provider and model.
-
-**Tests:** each provider is mocked and checked against the same schema; invalid evidence is rejected; a saved key is never returned; a failed key releases the report reservation.
-**Done when:** the preview workspace generates a valid report with each of the three providers.
+**Tests:** the SDK is mocked and its output parsed and validated; invalid evidence is rejected; a refusal or truncated output releases the report reservation; a missing server key returns 503 "AI reporting is not configured".
+**Done when:** the preview workspace generates a valid report end to end, and the evaluation set passes.
 
 ---
 
@@ -229,9 +225,9 @@ See **I-4** for why the labels name the provider rather than products such as "C
   1. A plan or trial that allows reports.
   2. `now() ≥ next_available_at`; otherwise a 429 "Next report available on <date>".
   3. **Paused** if a linked Google Ads connection is `needs_reauth`: a 409 "Reconnect Google Ads to resume reports". The pause does not push back the next report date.
-  4. The AI provider is ready.
+  4. Xaylo AI is configured.
 - The reporting period is fixed at the last 7 days. `get_reporting_allowance` returns `nextReportAt` and `pausedReason`.
-- **Plan rules** (replacing `PAID_REPORTS_PER_MONTH` and the one-report trial; see **I-6**): a 14-day trial gives two weekly reports, so the user sees the first action's result. Paid plans get one report every 7 days.
+- **Plan rules** (replacing `PAID_REPORTS_PER_MONTH` and the one-report trial; see **I-6**): a 14-day trial gives two weekly reports, so the user sees the first action's result. **Xaylo Insights** (£49/month or £490/year) gets one report every 7 days. The plan catalogue is in `src/billing/plans.ts`. **Xaylo Autopilot** is listed as currently unavailable and cannot be bought.
 - **Reports page:** a card for the current action with **Mark as done** and **Skip**, a countdown to the next report, any pause banner, and the history collapsed.
 
 **Done when:** a second request within 7 days is refused; a `needs_reauth` connection pauses generation; the report contains exactly one action, whose metric's evidence ID exists in the data pool.
@@ -256,7 +252,7 @@ See **I-4** for why the labels name the provider rather than products such as "C
 
 **Goal:** The rings view is the primary Overview of all site traffic. Selecting a single route switches to the route map (the current topology view).
 
-- **Rename** "journeys" to **routes** in `PathList.vue`, `TrafficView.vue`, the captions and the tooltips. "Journey" now means only Xaylo Journeys.
+- **Already done in PR 1:** traffic paths are called **routes** in the UI, the code and the public guide, and `test/terminology.test.ts` keeps it that way. "Journey" now means only Xaylo Journeys. New components in this step must follow the same rule.
 - **`web/src/components/RingsBoard.vue`** reuses the geometry in `Dartboard.vue` (`center`, `ringRadius`, the bullseye, the glow filters) without `decoWedges` or `decoBand`:
   - Each ring is a step depth from entry: ring 1 holds landing pages, and the bullseye is conversion. Nodes are sized by sessions and coloured by their main source group (Google paid / organic / direct / referral / other), with a legend.
   - All traffic is shown as thin aggregate flows between rings. There are no two-way roads in this view.
@@ -278,6 +274,7 @@ See **I-4** for why the labels name the provider rather than products such as "C
 
 - `npm run check` and the database integration tests pass.
 - Google: the consent screen is verified and In production; the Cloud project has **Basic** access; every Ads level has been read on a live account; revoking access shows the re-approval pause.
-- All three AI providers produce valid reports on staging.
+- Xaylo AI passes the evaluation set on staging.
 - The weekly gate, the pause and the before/after result have been checked with a shifted clock.
-- The docs, the public guide and the pricing page are updated.
+- The docs, the public guide and the pricing page are updated, and the Stripe Prices match the plan catalogue (monthly and yearly, **I-17**).
+- CI (`.github/workflows/ci.yml`) is green and set as a required check on `main`.

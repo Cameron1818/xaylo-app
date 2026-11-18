@@ -16,9 +16,9 @@ No live accounts, sender domains, subscription products, prices or webhook endpo
 
 ## Tier rules
 
-Defaults implement a seven-day trial starting when the workspace is created, with **one AI report total** and a maximum **seven-day reporting lookback**. The report quota applies across the dashboard and MCP, and is reserved atomically before fetching sources or calling AI. Failed generations release reservations. Concurrent requests cannot produce extra free reports. Deleting a report does not reset usage. Expired reservations are cleaned automatically.
+Defaults implement a 14-day trial starting when the workspace is created, with **one AI report total** and a maximum **seven-day reporting lookback**. The report quota applies across the dashboard and MCP, and is reserved atomically before fetching sources or calling AI. Failed generations release reservations. Concurrent requests cannot produce extra free reports. Deleting a report does not reset usage. Expired reservations are cleaned automatically.
 
-- `FREE_TRIAL_DAYS=7`: trial duration. Set to `0` for one free report without a time-limited trial.
+- `FREE_TRIAL_DAYS=14`: trial duration. Set to `0` for one free report without a time-limited trial.
 - `FREE_REPORT_LOOKBACK_DAYS=7`: maximum free reporting window; public reporting periods are 7, 30 or 90 days.
 - `PAID_REPORTS_PER_MONTH=30`: initial paid allowance, configurable independently of the Stripe Price. Paid users can analyse up to 90 days. Quotas reset on the first day of each calendar month in UTC, regardless of billing interval.
 

@@ -18,7 +18,12 @@ test('app serves dashboard assets and guards management API', async () => {
       assert.match(guide.body, /Give every visit/);
       assert.match(guide.body, /id="setup"/);
       assert.match(guide.body, /href="\/app"/);
-      assert.doesNotMatch(guide.body, /__TRIAL_LABEL__|__FREE_LOOKBACK__|__TRIAL_DETAIL__/);
+      assert.doesNotMatch(guide.body, /__TRIAL_LABEL__|__FREE_LOOKBACK__|__TRIAL_DETAIL__|__PLAN_CARDS__/);
+      assert.match(guide.body, /14-day free trial/);
+      assert.match(guide.body, /£49\/month/);
+      assert.match(guide.body, /£490\/year/);
+      assert.match(guide.body, /£149\/month/);
+      assert.match(guide.body, /Currently unavailable/);
     }
     const page = await app.inject('/app');
     assert.equal(page.statusCode, 200);

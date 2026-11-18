@@ -63,7 +63,7 @@ export function directedFlows(graph, includeRevisits = true) {
   })).filter((edge) => edge.weight > 0)
 }
 
-// Reverse breadth-first distances stay finite even when journeys contain cycles.
+// Reverse breadth-first distances stay finite even when routes contain cycles.
 // Derive these from the full cohort, so display filters never rearrange the rings.
 export function buildLayout(graph, goalId) {
   const ring = new Map([[goalId, 0]])

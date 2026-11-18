@@ -11,7 +11,7 @@ const emit = defineEmits(['hover', 'leave', 'select'])
 
 <template>
   <div class="pathlist">
-    <h2 class="pathlist-title">Session journeys</h2>
+    <h2 class="pathlist-title">Visitor routes</h2>
     <p class="pathlist-sub">Hover to trace a route · click to keep it selected. Click again to show all.</p>
     <ul class="pathlist-list">
       <li
@@ -38,7 +38,7 @@ const emit = defineEmits(['hover', 'leave', 'select'])
               <span v-if="i < p.pages.length - 1" class="arrow">→</span>
             </template>
           </span>
-          <span class="journey-tags">
+          <span class="route-tags">
             <span v-if="selectedPathKey === p.key" class="selected-tag">Selected</span>
             <span :class="{ converted: p.converted }">{{ p.converted ? goal.label : 'Left before conversion' }}</span>
             <span v-if="p.hasLoop" class="loop-tag">↩ Repeat visits</span>
@@ -111,7 +111,7 @@ const emit = defineEmits(['hover', 'leave', 'select'])
 }
 .path-row.selected { border-color: #e8b923; }
 .path-row:focus-visible { outline: 2px solid #e8b923; outline-offset: -2px; }
-.journey-tags .selected-tag { color: #fff6d8; background: #665217; }
+.route-tags .selected-tag { color: #fff6d8; background: #665217; }
 
 .path-steps {
   display: flex;
@@ -136,10 +136,10 @@ const emit = defineEmits(['hover', 'leave', 'select'])
   font-size: 11px;
 }
 
-.journey-tags { display: flex; flex-wrap: wrap; gap: 6px; font-size: 10px; color: #9aa0c3; }
-.journey-tags span { background: #252538; padding: 3px 6px; border-radius: 4px; }
-.journey-tags .converted { color: #e8b923; }
-.journey-tags .loop-tag { color: #c4adff; }
+.route-tags { display: flex; flex-wrap: wrap; gap: 6px; font-size: 10px; color: #9aa0c3; }
+.route-tags span { background: #252538; padding: 3px 6px; border-radius: 4px; }
+.route-tags .converted { color: #e8b923; }
+.route-tags .loop-tag { color: #c4adff; }
 .path-meta {
   display: flex;
   justify-content: space-between;

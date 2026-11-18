@@ -17,6 +17,7 @@ import { registerGoogleRoutes } from '../google/routes.js';
 import { registerMcpRoutes } from '../mcp/routes.js';
 import { registerAccountRoutes } from '../accounts/routes.js';
 import { registerBillingRoutes } from '../billing/routes.js';
+import { planCardsHtml } from '../billing/plans.js';
 import { registerGhlRoutes, consumeGhlState } from '../ghl/routes.js';
 
 const contextSchema = z.object({ userId: z.string(), activeLocation: z.string(), role: z.string().optional() });
@@ -69,7 +70,8 @@ export async function buildApp() {
     return reply.type('text/html').header('Cache-Control', 'public, max-age=300').send(template
       .replaceAll('__TRIAL_LABEL__', trialLabel)
       .replaceAll('__FREE_LOOKBACK__', String(env.FREE_REPORT_LOOKBACK_DAYS))
-      .replaceAll('__TRIAL_DETAIL__', trialDetail));
+      .replaceAll('__TRIAL_DETAIL__', trialDetail)
+      .replaceAll('__PLAN_CARDS__', planCardsHtml()));
   });
   app.get('/app', async (_request, reply) => reply.type('text/html').send(await readFile(fileURLToPath(new URL('../../web/dist/index.html', import.meta.url)))));
   app.get('/oauth/callback', async (request, reply) => {

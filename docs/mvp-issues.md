@@ -7,9 +7,9 @@ This file lists the issues raised while scoping [the MVP plan](mvp-plan.md) and 
 | I-1 | Resolved | 3 | Read-only enforced by Xaylo; MVP does read operations only |
 | I-2 | Verify | 1 | Developer token retired; access now belongs to the Cloud project |
 | I-3 | High | 1, 2 | Google verification, and Testing tokens that expire after 7 days |
-| I-4 | Resolved, with naming caution | 7 | User chooses the AI provider: Xaylo AI, OpenAI or Claude |
-| I-5 | Resolved | 7 | Keys are entered in the dashboard, never through MCP |
-| I-6 | Decision | 8 | Trial and plan rules replace the monthly quota |
+| I-4 | Resolved | 7 | Xaylo AI only; the OpenAI code path is removed |
+| I-5 | Resolved | 7 | No customer API keys anywhere |
+| I-6 | Resolved | 8 | 14-day trial; Insights at £49; Autopilot shown as unavailable |
 | I-7 | Medium | 9 | Before/after results are correlational and affected by conversion lag |
 | I-8 | Resolved | 10 | "Routes" for traffic paths; "Xaylo Journeys" for configured journeys |
 | I-9 | Medium | 4, 9 | Storing baselines conflicts with the documented storage policy |
@@ -19,10 +19,12 @@ This file lists the issues raised while scoping [the MVP plan](mvp-plan.md) and 
 | I-13 | Low | 1 | Google Ads API version upkeep |
 | I-14 | Low | 6 | GHL scopes |
 | I-15 | Medium | 10 | Rings view payload size |
-| I-16 | Partly resolved | all | `main` is protected; no CI yet |
-| I-17 | Medium | 8 | Billing supports only one Stripe price |
+| I-16 | Resolved | all | `main` is protected; CI added |
+| I-17 | Medium | 8 | Billing supports only one Stripe price; yearly checkout is missing |
 | I-18 | Future | ROI Pro | The first write operation ends the read-only position |
 | I-19 | Medium | 1 | Explorer quota is shared across all workspaces |
+| I-20 | Medium | pricing | Advertising features that are not built yet |
+| I-21 | Low | 7 | Opus report cost and latency |
 
 ---
 
@@ -48,34 +50,21 @@ While the consent screen is in Testing, refresh tokens expire after 7 days and o
 - The Step 2 re-approval pause means an expired token pauses reports and shows a one-click reconnect, instead of an error.
 - Confirm during submission that no CASA assessment is needed (`adwords` is expected to be a sensitive scope, not a restricted one).
 
-### I-4 User chooses the AI provider (Resolved, with naming caution)
+### I-4 Xaylo AI only (Resolved)
 
-Decision: workspaces choose between **Xaylo AI** (included, using Xaylo's key and a low-cost model), **OpenAI with their own key** (reusing the existing code) and **Claude with their own key**.
+Decision: there is no provider choice and no customer key. Every report uses Xaylo AI: Xaylo's Anthropic key and `claude-opus-5-5` at high effort, chosen for report quality. Step 7 removes the OpenAI code path and the `OPENAI_API_KEY` and `AI_MODEL` settings. List Anthropic as a sub-processor in the privacy policy.
 
-**Naming caution:** avoid labels such as "ChatGPT-Astra" or "Claude-Fable".
-- ChatGPT is OpenAI's consumer product, and an OpenAI API key does not use ChatGPT.
-- "Claude Fable" is the name of a real Anthropic model family, so the label would suggest a model or partnership the setting does not provide.
-- Inventing sub-brands on top of other companies' trademarks invites confusion and possible objections.
+### I-5 No customer API keys anywhere (Resolved)
 
-Use plain descriptive labels: "Xaylo AI", "OpenAI (your key)", "Claude (your key)". Show the selected model as a separate field.
+With Xaylo AI as the only engine, customers never enter or send an API key, in the dashboard or through MCP. Claude and other assistants can still connect to Xaylo's MCP server through the existing OAuth flow; that needs no key.
 
-**Model for Xaylo AI:** `claude-haiku-5-5`, costing about $0.01 per report. Measure report quality against `claude-sonnet-5-5` (about $0.10 per report) on staging data before launch. The cost is low enough to use the better model for paid plans if it gives better results.
+### I-6 Trial and plan rules (Resolved)
 
-**Privacy policy:** list Anthropic as a sub-processor for Xaylo AI. For keys the user brings, the user's own agreement with OpenAI or Anthropic applies.
-
-### I-5 Keys are entered in the dashboard, never through MCP (Resolved)
-
-"MCP takes a Claude API key" is implemented as a workspace setting: the key is entered once in Connections, stored encrypted, and used for reports requested from both the dashboard and MCP. Keys are never accepted as MCP tool arguments, because they would end up in assistant transcripts. Claude can still connect to Xaylo's MCP server as a custom connector through the existing OAuth flow, with no key needed.
-
-### I-6 Decision: trial and plan rules
-
-Proposal (see [docs/pricing.md](pricing.md)):
-- A 14-day trial with two weekly reports, replacing the current 7-day trial with one report.
-- **Insights** at $49 a month as the only paid plan at launch.
-- The weekly gate replaces `PAID_REPORTS_PER_MONTH`.
-- Source analysis and MCP read tools stay unlimited while a plan or trial is active.
-
-Confirm the price point, the trial length, and whether customers who bring their own key pay the same price.
+- A 14-day trial is now the default (`FREE_TRIAL_DAYS=14`).
+- **Xaylo Insights** costs £49/month or £490/year.
+- **Xaylo Autopilot** costs £149/month or £1,490/year. It is shown as currently unavailable and cannot be bought.
+- Both plans come from `src/billing/plans.ts`.
+- The trial currently includes one report. Step 8 changes this to two weekly reports and replaces `PAID_REPORTS_PER_MONTH` with the 7-day gate.
 
 ### I-7 Before/after results are correlational and affected by conversion lag (Medium)
 
@@ -113,13 +102,20 @@ The MVP's GHL reads use scopes that are already requested. Adding more GHL scope
 
 Aggregate on the server (pages × ring × source group, plus flows between rings), cap nodes at about 12 per ring with an "Other pages" node, and fetch detailed routes only when a route is selected.
 
-### I-16 `main` is protected; no CI yet (Partly resolved)
+### I-16 `main` is protected; CI added (Resolved)
 
-`main` is now protected. The repository has no CI workflow yet, so add a GitHub Actions job that runs `npm run check` on pull requests and make it a required status check.
+`main` is protected. `.github/workflows/ci.yml` runs `npm ci` and `npm run check` on every pull request and on pushes to `main`. It starts a PostgreSQL 16 service, so the database integration test runs too. After the first green run, set **Build and test** as a required status check in the branch protection settings.
 
-### I-17 Billing supports only one Stripe price (Medium)
+### I-17 Billing supports only one Stripe price; yearly checkout is missing (Medium)
 
-`STRIPE_PRICE_ID` and `subscriptionPaid` in `src/billing` assume one plan. Launch with Insights only. Growth and Agency need a mapping from price to plan, limits per plan (Ads accounts, Xaylo Journeys, lookback period) and per-workspace billing for agencies. Plan that as a follow-up after the MVP.
+`STRIPE_PRICE_ID` and `subscriptionPaid` assume a single price. The guide and Billing page now show **£490/year** next to £49/month, but checkout can only sell the one configured price.
+
+Before launch:
+- Create GBP monthly and yearly Stripe Prices for Insights.
+- Add `STRIPE_YEARLY_PRICE_ID`.
+- Let checkout take an `interval`, and accept either price in `subscriptionPaid`.
+
+Autopilot needs no Stripe Price until it is built.
 
 ### I-18 The first write operation ends the read-only position (Future)
 
@@ -134,3 +130,14 @@ Quotas belong to Xaylo's Cloud project, so Explorer's 2,880 operations a day is 
 - Log the operations count per request.
 - Alert at 70% of the daily quota.
 - Apply for Basic access (15,000 operations a day) as soon as brand verification passes.
+
+### I-20 Advertising features that are not built yet (Medium)
+
+Autopilot advertises daily reports, automatic ROI improvements, automated strategy and custom AI journeys, none of which exist yet. To keep the listing fair under UK consumer protection rules, the card is greyed out, labelled "Currently unavailable", has no purchase button, and the guide says its features are "planned, not available". Do not collect payment or pre-orders for it.
+
+"Automatic ROI improvements" implies writing to Google Ads, which is a separate project (**I-18**). Avoid promising specific ROI figures.
+
+### I-21 Opus report cost and latency (Low)
+
+Each Xaylo AI report on `claude-opus-5-5` costs about £0.32 and can take a minute or more with thinking. Use streaming with a generous timeout, keep the "Generating…" state in the UI, and cache the fixed system prompt. If daily Autopilot reports are built later, revisit the model choice and size for each report type.
+

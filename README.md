@@ -6,7 +6,7 @@ Standalone Node.js, TypeScript and Vue app for personalised customer journeys, c
 
 The site at [xaylo.com](https://xaylo.com/) describes the product as connected page, AI agent and email experiences. The first release stores `agentContext` and `emailAngle` in each journey for downstream use. It does not author GHL AI agents or email workflows automatically.
 
-Xaylo reads GHL and Google Ads on demand and retains its own tracking data and report summaries. The dashboard includes Reports, Connections and Billing, and the same reporting tools are available through an authenticated MCP endpoint. The default free tier is a seven-day trial with one report; paid pricing and limits are configured server-side. See [account, reporting and subscription setup](docs/reporting.md) for configuration, storage rules, API interfaces and validation.
+Xaylo reads GHL and Google Ads on demand and retains its own tracking data and report summaries. The dashboard includes Reports, Connections and Billing, and the same reporting tools are available through an authenticated MCP endpoint. The default free tier is a 14-day trial with one report. The first paid plan, Xaylo Insights, is £49/month or £490/year; plans are listed in `src/billing/plans.ts` and described in [the pricing proposal](docs/pricing.md). See [account, reporting and subscription setup](docs/reporting.md) for configuration, storage rules, API interfaces and validation.
 
 ## Structure
 
@@ -70,7 +70,7 @@ The callback saves encrypted, rotating OAuth tokens. The embedded page requests 
 
 To bind an existing GHL contact to a visitor, send `POST /api/contact-links` with `{ "contactId": "..." }` and the admin session bearer token. The response contains a 30-day signed `contactToken`; set it as `data-contact-token` on the tracker script or call `window.Xaylo.setContactToken(token)`. Contact existence and location ownership are checked through GHL. Use this from a trusted server or a protected automation endpoint, never expose the admin session token in public page code.
 
-The Overview dartboard groups page views into sessions with a 30-minute inactivity boundary, keeps return visits, and counts a conversion once per session. It uses `GET /api/traffic?days=30` (also 7 or 90) for the signed-in location. Page labels omit query strings; UTM values remain separate tracking properties. Existing events without a session ID are grouped by visitor and inactivity. Hover a session journey to trace its route, or click to keep it selected; clicking another switches selection and clicking the selected journey again clears it. The local demo includes 220 sessions with loops and five roads carrying traffic in both directions.
+The Overview dartboard groups page views into sessions with a 30-minute inactivity boundary, keeps return visits, and counts a conversion once per session. It uses `GET /api/traffic?days=30` (also 7 or 90) for the signed-in location. Page labels omit query strings; UTM values remain separate tracking properties. Existing events without a session ID are grouped by visitor and inactivity. Hover a visitor route to trace it, or click to keep it selected; clicking another switches selection and clicking the selected route again clears it. "Routes" are observed session paths; "Xaylo Journeys" are the configured personalisation journeys. The local demo includes 220 sessions with loops and five roads carrying traffic in both directions.
 
 ## Validation and release limits
 
