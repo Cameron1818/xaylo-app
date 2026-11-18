@@ -6,8 +6,10 @@ import Reports from './Reports.vue'
 import Connections from './Connections.vue'
 import AccountAccess from './AccountAccess.vue'
 import Billing from './Billing.vue'
+import Admin from './Admin.vue'
 
-const tabs = ['Overview', 'Reports', 'Journeys', 'Tracking', 'Connections', 'Billing', 'Settings']
+const isAdmin = ref(false)
+const tabs = computed(() => ['Overview', 'Reports', 'Journeys', 'Tracking', 'Connections', 'Billing', 'Settings', ...(isAdmin.value ? ['Admin'] : [])])
 const tab = ref(new URLSearchParams(location.search).has('billing') ? 'Billing' : 'Overview')
 const token = ref('')
 const status = ref('Connecting…')
@@ -45,6 +47,7 @@ async function load() {
   origins.value = locationSettings.allowedOrigins.join('\n')
   events.value = activity.events
   await loadTraffic()
+  api('/api/admin/me').then(result => { isAdmin.value = result.isAdmin }).catch(() => { isAdmin.value = false })
 }
 async function loadTraffic() {
   try { traffic.value = await api(`/api/traffic?days=${days.value}`); error.value = '' }
@@ -102,7 +105,7 @@ async function connect() {
   await load()
 }
 async function logout() {
-  try { await api('/api/auth/logout', { method: 'POST' }) } finally { token.value = ''; standalone.value = false; journeys.value = []; traffic.value = null; settings.value = null; status.value = 'Sign in' }
+  try { await api('/api/auth/logout', { method: 'POST' }) } finally { token.value = ''; standalone.value = false; journeys.value = []; traffic.value = null; settings.value = null; isAdmin.value = false; tab.value = 'Overview'; status.value = 'Sign in' }
 }
 onMounted(() => { connect().catch(cause => { status.value = 'Connection failed'; error.value = cause.message }).finally(() => { connecting.value = false }) })
 </script>
@@ -125,9 +128,10 @@ onMounted(() => { connect().catch(cause => { status.value = 'Connection failed';
           <p v-if="isPreview && totalSessions" class="preview-note">Local test data · {{ totalSessions.toLocaleString() }} visitor sessions</p>
           <div class="metrics"><div class="metric"><span>Sessions</span><strong>{{ totalSessions.toLocaleString() }}</strong></div><div class="metric"><span>Conversions</span><strong>{{ conversions.toLocaleString() }}</strong></div><div class="metric"><span>Conversion rate</span><strong>{{ totalSessions ? (conversions / totalSessions * 100).toFixed(1) : '0.0' }}%</strong></div><div class="metric"><span>Published journeys</span><strong>{{ journeys.filter(j => j.status === 'published').length }}</strong></div></div>
           <div v-if="traffic && totalSessions" class="board-card"><TrafficView :key="days" :traffic="traffic" /></div>
-          <div v-else class="empty"><strong>Your traffic dartboard is ready.</strong><p>Add the tracker to your website to see real visits and conversions here.</p><button @click="tab = 'Tracking'">Set up tracking</button></div>
+          <div v-else class="empty"><strong>Your visitor journey map is ready.</strong><p>Add the tracker to your website to see real visits and conversions here.</p><button @click="tab = 'Tracking'">Set up tracking</button></div>
         </section>
         <section v-else-if="tab === 'Reports'"><Reports :api="api" @subscribe="tab = 'Billing'" /></section>
+        <section v-else-if="tab === 'Admin' && isAdmin"><Admin :api="api" /></section>
         <section v-else-if="tab === 'Billing'"><Billing :api="api" /></section>
         <section v-else-if="tab === 'Connections'"><Connections :api="api" /></section>
         <section v-else-if="tab === 'Journeys'"><div class="section-title"><div><span class="eyebrow">BUILD</span><h1>Journeys</h1><p>Match visitor intent to a page, conversation and follow-up.</p></div></div><JourneyManager :journeys="journeys" :api="api" @changed="load" /></section>

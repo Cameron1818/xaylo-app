@@ -18,6 +18,7 @@ import { registerMcpRoutes } from '../mcp/routes.js';
 import { registerAccountRoutes } from '../accounts/routes.js';
 import { registerBillingRoutes } from '../billing/routes.js';
 import { planCardsHtml } from '../billing/plans.js';
+import { registerAdminRoutes } from '../admin/routes.js';
 import { registerGhlRoutes, consumeGhlState } from '../ghl/routes.js';
 
 const contextSchema = z.object({ userId: z.string(), activeLocation: z.string(), role: z.string().optional() });
@@ -230,6 +231,7 @@ export async function buildApp() {
   });
   await registerAccountRoutes(app);
   await registerBillingRoutes(app);
+  await registerAdminRoutes(app);
   await registerGhlRoutes(app);
   await registerGoogleRoutes(app);
   await registerReportingRoutes(app);

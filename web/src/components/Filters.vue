@@ -16,7 +16,7 @@ const emit = defineEmits(['update:goalId', 'update:minSessions', 'update:focusId
 <template>
   <div class="filters">
     <div class="filter-group">
-      <label for="goal-select">🎯 Conversion goal</label>
+      <label for="goal-select">Conversion goal</label>
       <select
         id="goal-select"
         :value="goalId"
@@ -27,7 +27,7 @@ const emit = defineEmits(['update:goalId', 'update:minSessions', 'update:focusId
     </div>
 
     <div class="filter-group">
-      <label for="focus-select">🔍 Focus page</label>
+      <label for="focus-select">Focus page</label>
       <select
         id="focus-select"
         :value="focusId || ''"
@@ -56,7 +56,7 @@ const emit = defineEmits(['update:goalId', 'update:minSessions', 'update:focusId
 
     <div class="filter-group slider-group">
       <label for="min-sessions">
-        📉 Min. sessions per path
+        Min. sessions per path
         <span class="filter-value">{{ minSessions.toLocaleString() }}</span>
       </label>
       <input
@@ -93,7 +93,7 @@ const emit = defineEmits(['update:goalId', 'update:minSessions', 'update:focusId
 }
 .return-toggle { align-self: center; }
 .return-toggle label { align-items: center; justify-content: flex-start; cursor: pointer; }
-.return-toggle input { accent-color: #4fd1c5; }
+.return-toggle input { accent-color: #b7a2ed; }
 .return-toggle small { font-size: 11px; color: #7d82a3; }
 .slider-group {
   flex: 1 1 220px;

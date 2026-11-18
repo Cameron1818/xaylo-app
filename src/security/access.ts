@@ -9,8 +9,8 @@ export function bearer(headers: Record<string, unknown>) {
   return typeof auth === 'string' && auth.startsWith('Bearer ') ? auth.slice(7) : '';
 }
 export async function assertActive(locationId: string) {
-  const result = await pool.query("SELECT 1 FROM installations WHERE location_id=$1 AND status='active'", [locationId]);
-  if (!result.rowCount) throw httpError(403, 'Location is not installed');
+  const result = await pool.query("SELECT 1 FROM installations WHERE location_id=$1 AND status='active' AND suspended_at IS NULL", [locationId]);
+  if (!result.rowCount) throw httpError(403, 'Location is not installed or has been suspended');
 }
 export async function requireSession(request: { headers: Record<string, unknown> }): Promise<Session> {
   const session = readToken<Session>(bearer(request.headers), getEnv().SESSION_SECRET);
@@ -28,4 +28,18 @@ export async function requireSession(request: { headers: Record<string, unknown>
     if (!valid.rowCount) throw httpError(401, 'HighLevel connection was disconnected');
   }
   return session;
+}
+export function isAdminEmail(email: string | null | undefined) {
+  return Boolean(email) && getEnv().ADMIN_EMAILS.split(',').map(value => value.trim().toLowerCase()).filter(Boolean).includes(email!.toLowerCase());
+}
+export async function sessionEmail(userId: string) {
+  // GHL-embedded sessions carry HighLevel user ids, which are not app_users ids and can never be admins.
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) return undefined;
+  return (await pool.query('SELECT email FROM app_users WHERE id=$1', [userId])).rows[0]?.email as string | undefined;
+}
+export async function requireAdmin(request: { headers: Record<string, unknown> }) {
+  const session = await requireSession(request);
+  const email = await sessionEmail(session.userId);
+  if (!isAdminEmail(email)) throw httpError(403, 'Forbidden');
+  return { ...session, email: email!.toLowerCase() };
 }

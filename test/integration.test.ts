@@ -13,9 +13,9 @@ import { stripeClient } from '../src/billing/stripe.js';
 
 const enabled = Boolean(process.env.TEST_DATABASE_URL);
 test('database integration: clients, accounts, reports, MCP, quotas and billing', { skip: !enabled }, async t => {
-  for (const file of ['001_init.sql', '002_sessions.sql', '003_reporting.sql', '004_accounts.sql', '005_entitlements.sql']) await pool.query(await readFile(new URL(`../migrations/${file}`, import.meta.url), 'utf8'));
+  for (const file of ['001_init.sql', '002_sessions.sql', '003_reporting.sql', '004_accounts.sql', '005_entitlements.sql', '006_admin.sql']) await pool.query(await readFile(new URL(`../migrations/${file}`, import.meta.url), 'utf8'));
   // Migration scripts must be safe to rerun.
-  for (const file of ['003_reporting.sql', '004_accounts.sql', '005_entitlements.sql']) await pool.query(await readFile(new URL(`../migrations/${file}`, import.meta.url), 'utf8'));
+  for (const file of ['003_reporting.sql', '004_accounts.sql', '005_entitlements.sql', '006_admin.sql']) await pool.query(await readFile(new URL(`../migrations/${file}`, import.meta.url), 'utf8'));
   const app = await buildApp();
   const previousFetch = globalThis.fetch;
   const fixtures: string[] = [];

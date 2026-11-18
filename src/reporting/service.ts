@@ -8,6 +8,7 @@ import { googleReport } from '../google/reporting.js';
 import { selectedAccount } from '../google/client.js';
 import { trafficSummary } from './traffic.js';
 import { generateAnalysis } from './ai.js';
+import { aiConfig } from '../admin/settings.js';
 import { promptVersion } from './prompts.js';
 import { requireAnalysisAccess, reserveReport, releaseReport } from '../billing/entitlements.js';
 import { reportPeriod, reportInput, type Period } from './period.js';
@@ -61,7 +62,7 @@ export async function overview(locationId: string, input: z.infer<typeof reportI
     mappingCoverage = { googleSessions: total, campaignMappedSessions: linked, fraction: total ? linked / total : null,
       method: 'Explicit xaylo_campaign_id or configured UTM campaign mapping', source: 'xaylo' };
   }
-  return { period, context, traffic, business, crm, ads, mappingCoverage, limitations, aiConfigured: Boolean(getEnv().OPENAI_API_KEY && getEnv().AI_MODEL) };
+  return { period, context, traffic, business, crm, ads, mappingCoverage, limitations, aiConfigured: await aiConfig().then(ai => Boolean(ai.apiKey && ai.model)) };
 }
 export function evidenceSnapshot(data: Awaited<ReturnType<typeof overview>>) {
   const evidence: Record<string, unknown> = Object.create(null);
@@ -105,7 +106,7 @@ export async function createReport(locationId: string, userId: string, input: z.
       const active = await client.query("SELECT 1 FROM installations WHERE location_id=$1 AND status='active' FOR UPDATE", [locationId]);
       if (!active.rowCount) throw httpError(403, 'Workspace is not active');
       await client.query(`INSERT INTO reports(id,location_id,created_by,period,prompt_version,model,analysis,evidence) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [id, locationId, userId, data.period, promptVersion, getEnv().AI_MODEL, analysis,
+        [id, locationId, userId, data.period, promptVersion, (await aiConfig()).model, analysis,
           { metrics: evidence, contextVersion, businessSourceReference: data.business.status === 'available' ? data.business.data.sourceReference : null, limitations: data.limitations, detailLimit: 25 }]);
       const completed = await client.query("UPDATE report_usage SET status='completed',report_id=$3 WHERE location_id=$1 AND id=$2 AND status='pending' AND expires_at>now() RETURNING id", [locationId, reservation, id]);
       if (!completed.rowCount) throw httpError(409, 'Report reservation expired. Try again.');
