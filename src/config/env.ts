@@ -15,6 +15,7 @@ const schema = z.object({
   GOOGLE_ADS_DEVELOPER_TOKEN: z.string().default(''),
   GOOGLE_CLOUD_PROJECT: z.string().default(''),
   GOOGLE_ADS_API_VERSION: z.string().regex(/^v\d+$/).default('v26'),
+  ADMIN_EMAILS: z.string().default('cameron@swan-pay.com'),
   OPENAI_API_KEY: z.string().default(''),
   AI_MODEL: z.string().default(''),
   RESEND_API_KEY: z.string().default(''),

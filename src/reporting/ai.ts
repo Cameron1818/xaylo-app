@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { getEnv } from '../config/env.js';
+import { aiConfig } from '../admin/settings.js';
 import { httpError } from '../security/access.js';
 import { PROMPTS } from './prompts.js';
 
@@ -18,13 +18,13 @@ const jsonSchema = { type: 'object', additionalProperties: false, required: ['tr
   } } }, dataQuality: strings
 } };
 export async function generateAnalysis(context: object, evidence: Record<string, unknown>, limitations: string[]) {
-  const env = getEnv();
-  if (!env.OPENAI_API_KEY || !env.AI_MODEL) throw httpError(503, 'AI reporting is not configured');
+  const ai = await aiConfig();
+  if (!ai.apiKey || !ai.model) throw httpError(503, 'AI reporting is not configured');
   let response: Response;
   try {
     response = await fetch('https://api.openai.com/v1/responses', { method: 'POST', signal: AbortSignal.timeout(90_000),
-      headers: { Authorization: `Bearer ${env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: env.AI_MODEL, store: false, max_output_tokens: 6000,
+      headers: { Authorization: `Bearer ${ai.apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: ai.model, store: false, max_output_tokens: 6000,
         instructions: `${PROMPTS.safety}\n\n${PROMPTS.traffic}\n\n${PROMPTS.marketing}`,
         input: JSON.stringify({ context, evidence, limitations }), text: { format: { type: 'json_schema', name: 'xaylo_marketing_report', strict: true, schema: jsonSchema } } }) });
   } catch { throw httpError(502, 'AI reporting is unavailable; try again'); }
