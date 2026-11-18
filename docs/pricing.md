@@ -1,6 +1,6 @@
 # Pricing and trial
 
-The plan catalogue in code is `src/billing/plans.ts`. It is the single source for the plan names, prices and features shown on the public guide (`/#pricing`) and on the dashboard's Billing page. Checkout charges the Stripe Price configured in `STRIPE_PRICE_ID`, which must match the Insights monthly price (**I-17**).
+The plan catalogue in code is `src/billing/plans.ts`. It is the single source for the plan names, prices and features shown on the public guide (`/#pricing`) and on the dashboard's Billing page. Billing will move to a **SwanPay** checkout, which the product owner is implementing separately. Until then, the existing Stripe code remains in place but is not used for launch (**I-17**).
 
 ## Plans
 

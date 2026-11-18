@@ -276,5 +276,5 @@ The existing tools stay; `get_crm_summary` remains the GHL read tool. Update the
 - Google: the consent screen is verified and In production; the Cloud project has **Basic** access; every Ads level has been read on a live account; revoking access shows the re-approval pause.
 - Xaylo AI passes the evaluation set on staging.
 - The weekly gate, the pause and the before/after result have been checked with a shifted clock.
-- The docs, the public guide and the pricing page are updated, and the Stripe Prices match the plan catalogue (monthly and yearly, **I-17**).
+- The docs, the public guide and the pricing page are updated, and SwanPay checkout sells the Insights monthly and yearly prices from the plan catalogue (**I-17**).
 - CI (`.github/workflows/ci.yml`) is green and set as a required check on `main`.

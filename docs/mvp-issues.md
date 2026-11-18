@@ -20,7 +20,7 @@ This file lists the issues raised while scoping [the MVP plan](mvp-plan.md) and 
 | I-14 | Low | 6 | GHL scopes |
 | I-15 | Medium | 10 | Rings view payload size |
 | I-16 | Resolved | all | `main` is protected; CI added |
-| I-17 | Medium | 8 | Billing supports only one Stripe price; yearly checkout is missing |
+| I-17 | Owner | 8 | Billing moves from Stripe to SwanPay |
 | I-18 | Future | ROI Pro | The first write operation ends the read-only position |
 | I-19 | Medium | 1 | Explorer quota is shared across all workspaces |
 | I-20 | Medium | pricing | Advertising features that are not built yet |
@@ -106,16 +106,21 @@ Aggregate on the server (pages × ring × source group, plus flows between rings
 
 `main` is protected. `.github/workflows/ci.yml` runs `npm ci` and `npm run check` on every pull request and on pushes to `main`. It starts a PostgreSQL 16 service, so the database integration test runs too. After the first green run, set **Build and test** as a required status check in the branch protection settings.
 
-### I-17 Billing supports only one Stripe price; yearly checkout is missing (Medium)
+### I-17 Billing moves from Stripe to SwanPay (Owner, later)
 
-`STRIPE_PRICE_ID` and `subscriptionPaid` assume a single price. The guide and Billing page now show **£490/year** next to £49/month, but checkout can only sell the one configured price.
+Xaylo will not use Stripe. The product owner will implement a **SwanPay** checkout later. Until then:
 
-Before launch:
-- Create GBP monthly and yearly Stripe Prices for Insights.
-- Add `STRIPE_YEARLY_PRICE_ID`.
-- Let checkout take an `interval`, and accept either price in `subscriptionPaid`.
+- The existing Stripe code (`src/billing/stripe.ts`, `src/billing/routes.ts`, the `STRIPE_*` settings and the Stripe webhook) stays in place but unconfigured. With no Stripe settings, the Billing page shows "Subscriptions are not configured", and trial access works as before.
+- The plan catalogue (`src/billing/plans.ts`) does not depend on any payment provider. SwanPay checkout should sell Insights monthly (£49) and yearly (£490) from it.
 
-Autopilot needs no Stripe Price until it is built.
+What the SwanPay work needs to cover:
+- Replace `entitlement()`'s Stripe subscription check with SwanPay subscription status, verified on the server and never trusted from the checkout return URL.
+- A signed webhook for subscription changes, deduplicated the way `billing_receipts` does today.
+- Monthly and yearly intervals.
+- A customer portal or cancellation path.
+- Removing the Stripe code, settings and the `stripe` dependency, and updating `docs/reporting.md` and the integration test's billing section.
+
+Autopilot needs no SwanPay product until it is built.
 
 ### I-18 The first write operation ends the read-only position (Future)
 

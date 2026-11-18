@@ -1,5 +1,5 @@
 // Single source of truth for plan names, prices and features shown in the public guide and Billing.
-// Checkout still charges the Stripe Price configured in STRIPE_PRICE_ID; keep it in step with Insights.
+// Provider-neutral: the SwanPay checkout (to be implemented) should sell these prices. See docs/mvp-issues.md I-17.
 export type Plan = {
   id: 'insights' | 'autopilot';
   name: string;
