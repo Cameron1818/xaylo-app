@@ -19,7 +19,7 @@ const schema = z.object({
   AI_MODEL: z.string().default(''),
   RESEND_API_KEY: z.string().default(''),
   EMAIL_FROM: z.string().default(''),
-  FREE_TRIAL_DAYS: z.coerce.number().int().min(0).max(90).default(7),
+  FREE_TRIAL_DAYS: z.coerce.number().int().min(0).max(90).default(14),
   FREE_REPORT_LOOKBACK_DAYS: z.coerce.number().int().min(7).max(90).default(7),
   PAID_REPORTS_PER_MONTH: z.coerce.number().int().positive().max(10000).default(30),
   STRIPE_SECRET_KEY: z.string().default(''),

@@ -5,9 +5,10 @@ import { getEnv } from '../config/env.js';
 import { httpError, requireSession } from '../security/access.js';
 import { stripeClient, subscriptionPaid } from './stripe.js';
 import { entitlement } from './entitlements.js';
+import { PLANS } from './plans.js';
 
 export async function registerBillingRoutes(app: FastifyInstance) {
-  app.get('/api/billing', async request => entitlement((await requireSession(request)).locationId));
+  app.get('/api/billing', async request => ({ ...await entitlement((await requireSession(request)).locationId), plans: PLANS }));
   app.post('/api/billing/checkout', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async request => {
     const { locationId } = await requireSession(request);
     const env = getEnv();

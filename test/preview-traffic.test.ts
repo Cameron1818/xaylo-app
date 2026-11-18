@@ -28,7 +28,7 @@ test('preview traffic has 1,000 varied sessions, return visits and 60 conversion
   model.showReturnTraffic.value = false;
   assert.ok(!model.edges.value.some(edge => edge.from.endsWith('/book') && edge.to.endsWith('/pricing')));
   assert.equal(model.totalSessions.value, 1000);
-  model.journeyType.value = 'looping';
+  model.routeType.value = 'looping';
   assert.equal(model.visibleSessions.value, 220);
 });
 

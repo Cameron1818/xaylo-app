@@ -23,7 +23,7 @@ export function useTrafficData(rawData) {
   const minSessions = ref(0)
   const focusId = ref(null)
   const showReturnTraffic = ref(true)
-  const journeyType = ref('all')
+  const routeType = ref('all')
   const goal = computed(() => pagesById[goalId.value])
   watch(goalId, () => {
     minSessions.value = 0
@@ -34,7 +34,7 @@ export function useTrafficData(rawData) {
   const maxPathSessions = computed(() => Math.max(0, ...allPaths.value.map((p) => p.sessions)))
   const visiblePaths = computed(() => allPaths.value.filter((p) =>
     p.sessions >= minSessions.value &&
-    (journeyType.value === 'all' || (journeyType.value === 'converted' ? p.converted : p.hasLoop))
+    (routeType.value === 'all' || (routeType.value === 'converted' ? p.converted : p.hasLoop))
   ))
   const totalSessions = computed(() => allPaths.value.reduce((sum, p) => sum + p.sessions, 0))
   const convertedSessions = computed(() => allPaths.value.reduce((sum, p) => sum + (p.converted ? p.sessions : 0), 0))
@@ -196,7 +196,7 @@ export function useTrafficData(rawData) {
     visibleSessions,
     funnelStages,
     showReturnTraffic,
-    journeyType,
+    routeType,
     maxRing,
     center: CENTER,
     bullRadius: BULL_RADIUS,

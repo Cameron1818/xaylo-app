@@ -6,11 +6,11 @@ const props = defineProps({
   minSessions: { type: Number, required: true },
   maxPathSessions: { type: Number, required: true },
   showReturnTraffic: { type: Boolean, default: true },
-  journeyType: { type: String, default: 'all' },
+  routeType: { type: String, default: 'all' },
   focusId: { type: String, default: null },
 })
 
-const emit = defineEmits(['update:goalId', 'update:minSessions', 'update:focusId', 'update:showReturnTraffic', 'update:journeyType'])
+const emit = defineEmits(['update:goalId', 'update:minSessions', 'update:focusId', 'update:showReturnTraffic', 'update:routeType'])
 </script>
 
 <template>
@@ -39,9 +39,9 @@ const emit = defineEmits(['update:goalId', 'update:minSessions', 'update:focusId
     </div>
 
     <div class="filter-group">
-      <label for="journey-type">Journeys</label>
-      <select id="journey-type" :value="journeyType" @change="emit('update:journeyType', $event.target.value)">
-        <option value="all">All journeys</option>
+      <label for="route-type">Routes</label>
+      <select id="route-type" :value="routeType" @change="emit('update:routeType', $event.target.value)">
+        <option value="all">All routes</option>
         <option value="converted">Reached conversion</option>
         <option value="looping">With repeat visits</option>
       </select>

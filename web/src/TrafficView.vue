@@ -26,7 +26,7 @@ const {
   visibleSessions,
   funnelStages,
   showReturnTraffic,
-  journeyType,
+  routeType,
   maxRing,
   center,
   bullRadius,
@@ -118,7 +118,7 @@ const topPage = computed(() => [...nodes.value].sort((a, b) => b.weight - a.weig
   <div class="app" @mousemove="onMouseMove">
     <header class="app-header">
       <div class="title-block">
-        <h1>Traffic journeys</h1>
+        <h1>Route map</h1>
         <p>Explore how visitors browse, compare and return before <strong>{{ goal.label }}</strong>.</p>
       </div>
       <div class="stats">
@@ -153,9 +153,9 @@ const topPage = computed(() => [...nodes.value].sort((a, b) => b.weight - a.weig
       :max-path-sessions="maxPathSessions"
       :focus-id="focusId"
       :show-return-traffic="showReturnTraffic"
-      :journey-type="journeyType"
+      :route-type="routeType"
       @update:show-return-traffic="showReturnTraffic = $event"
-      @update:journey-type="journeyType = $event"
+      @update:route-type="routeType = $event"
       @update:goal-id="goalId = $event"
       @update:min-sessions="minSessions = $event"
       @update:focus-id="focusId = $event"
@@ -196,7 +196,7 @@ const topPage = computed(() => [...nodes.value].sort((a, b) => b.weight - a.weig
           @hover-center="onHoverCenter"
           @leave-center="onLeaveCenter"
         />
-        <p class="board-caption">{{ visibleSessions.toLocaleString() }} of {{ totalSessions.toLocaleString() }} sessions shown · {{ topPaths.length }} journeys. Wider carriageways carry more sessions. Paired lanes travel in opposite directions; hover a lane for first visits and revisits.{{ showReturnTraffic ? '' : ' Revisit traffic is hidden; session totals are unchanged.' }}</p>
+        <p class="board-caption">{{ visibleSessions.toLocaleString() }} of {{ totalSessions.toLocaleString() }} sessions shown · {{ topPaths.length }} routes. Wider carriageways carry more sessions. Paired lanes travel in opposite directions; hover a lane for first visits and revisits.{{ showReturnTraffic ? '' : ' Revisit traffic is hidden; session totals are unchanged.' }}</p>
       </div>
 
       <PathList
