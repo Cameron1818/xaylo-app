@@ -1,257 +1,283 @@
 # MVP plan: read-only Google Ads reporting, journey-aware MCP and weekly single-action reports
 
-This plan builds on the existing implementation described in [docs/reporting.md](reporting.md): the self-hosted deployment, email/GHL workspaces, the Google Ads OAuth client, the MCP endpoint with OAuth grants, and saved reports. Each step is small enough for one pull request. Every step lands through a pull request into `main`; nothing is committed directly to `main`.
+This plan builds on the existing implementation described in [docs/reporting.md](reporting.md): the self-hosted deployment, email/GHL workspaces, the Google Ads OAuth client, the MCP endpoint with OAuth grants, and saved reports. Each step is small enough for one pull request. All work lands through pull requests into the protected `main` branch.
 
-Open questions and risks are listed separately in [docs/mvp-issues.md](mvp-issues.md). Issue numbers below (for example, **I-3**) refer to that file.
+Open questions and risks are in [docs/mvp-issues.md](mvp-issues.md); issue numbers below (for example, **I-3**) refer to that file. Pricing and the trial are in [docs/pricing.md](pricing.md).
+
+## Terms
+
+| Term | Meaning |
+| --- | --- |
+| **Xaylo Journey** | A configured personalisation journey: rules, content and tags (the `journeys` table, recorded on events as `journey_id`). |
+| **Route** | An observed sequence of pages in one visitor session, from landing page to conversion or exit. The current dashboard calls these "journeys"; MVP renames them **routes**. |
+| **Rings view** | The new primary Overview: the whole site's traffic on concentric rings. |
+| **Route map** | The existing topology (two-way roads) view, opened when one route is selected. |
 
 ## MVP scope
 
 | Area | MVP behaviour |
 | --- | --- |
-| Hosting | Self-hosted, as today. No change. |
-| Overview | A global **rings** view (concentric rings, no dartboard segments) showing all site traffic. Selecting one journey switches to the existing **topology** (roads) view for that journey. |
-| Google Ads | Read-only. Connect once, pick an account from a named list, then read campaigns, conversion actions and clicks. There are no mutate calls. |
-| GHL | Read-only reporting, using the existing scopes. Tag writes stay limited to the existing journey conversion feature. |
-| MCP | Understands journeys, UTM sources, and how Google Ads traffic links to them, with a focus on conversions and clicks. Read-only tools for Ads and GHL. |
-| AI | Uses a Claude API key. Reads the whole cleaned data pool and returns **one action**. |
-| Cadence | At most one report per workspace every 7 days. Each new report opens with the measured result of the previous action. |
+| Hosting | Self-hosted, as today. |
+| Overview | The rings view (concentric rings, no dartboard segments) of all traffic. Selecting one route opens the route map. A Xaylo Journey filter applies to both views. |
+| Google Ads | **Read operations only**, enforced by Xaylo. The advertiser's only setup is one click on **Connect Google Ads** and approving Google's consent screen. If Google requires them to approve again, reports pause until they reconnect. |
+| GHL | Read-only reporting with the existing scopes. Tag writes remain limited to the existing journey conversion feature. |
+| MCP | Understands Xaylo Journeys, routes, UTM sources and how Google Ads traffic links to them, with a focus on conversions and clicks. Read-only tools for Ads and GHL. |
+| AI | The workspace chooses a provider: **Xaylo AI** (included, using Xaylo's own key and a low-cost model), **OpenAI (your key)** or **Claude (your key)**. Each report reads the whole cleaned data pool and returns **one action**. |
+| Cadence | At most one report every 7 days. Each new report opens with the measured result of the previous action. |
 
 ## Step overview
 
 | # | Step | Depends on | Size |
 | --- | --- | --- | --- |
-| 1 | Google Cloud approvals and Ads configuration checks | none | S |
-| 2 | One-click Google Ads connection | 1 | S–M |
+| 1 | Google Cloud access approvals and configuration checks | none | S |
+| 2 | One-click Google Ads connection and the re-approval pause | 1 | M |
 | 3 | Conversion- and click-focused Ads read model, with a read-only guard | 2 | S |
-| 4 | Linking Ads traffic to sessions and journeys | 3 | M |
-| 5 | Cleaned, journey-aware data pool | 4 | M |
-| 6 | MCP tools for journeys, sources, Ads and GHL | 5 | S |
-| 7 | Claude API key and provider switch | none (can run alongside 1–6) | S–M |
-| 8 | Weekly single-action report | 5, 7 | M |
+| 4 | Linking Ads traffic to sessions, routes and Xaylo Journeys | 3 | M |
+| 5 | Cleaned data pool | 4 | M |
+| 6 | MCP tools for journeys, routes, sources, Ads and GHL | 5 | S |
+| 7 | AI provider choice: Xaylo AI, OpenAI or Claude | none (can run alongside 1–6) | M |
+| 8 | Weekly single-action report, trial and plan rules | 5, 7 | M |
 | 9 | Results of the last change | 8 | S–M |
-| 10 | Rings view and switching to the journey topology view | none (can run alongside 1–9) | M |
+| 10 | Rings view and the route map | none (can run alongside 1–9) | M |
 
-Start Step 1 first: Google's approvals take days to weeks, and the other work can go ahead while they are pending. Steps 7 and 10 do not depend on the Ads work.
-
----
-
-## Step 1: Google Cloud approvals and Ads configuration checks
-
-**Goal:** Start the Google approval process now, and make the app say exactly which Google setting is missing instead of failing in the middle of a request.
-
-### 1a. Approvals and console setup (operator task, documented in `docs/google-ads-setup.md`)
-
-| # | Where | Action | Approval? | Typical wait |
-| --- | --- | --- | --- | --- |
-| 1 | Google Cloud Console → **APIs & Services → Library** | Create or choose the production project. Enable **Google Ads API**. | No | Immediate |
-| 2 | Google Search Console | Verify ownership of the production domain (the `PUBLIC_BASE_URL` host and the domain hosting the privacy policy). | Domain verification | Minutes |
-| 3 | Google Cloud Console → **Google Auth Platform → Branding** (OAuth consent screen) | User type **External**. App name "Xaylo", support email, logo, homepage `https://YOUR_HOST/`, privacy policy URL, terms URL, authorised domain = verified domain. | **Brand verification** | 2–3 business days |
-| 4 | **Google Auth Platform → Data Access** | Add exactly one scope: `https://www.googleapis.com/auth/adwords`. Do not add `openid`, `email` or Drive scopes. | **Sensitive-scope verification** (see 1b) | Several days to a few weeks |
-| 5 | **Google Auth Platform → Clients** | Create a **Web application** OAuth client. Authorised redirect URI: `https://YOUR_HOST/oauth/google/callback`. Copy the ID and secret into `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. | No | Immediate |
-| 6 | **Google Auth Platform → Audience** | While verification is pending, keep the app in **Testing** and add pilot users (100 at most). Move to **In production** once verification passes; Testing refresh tokens expire after 7 days (**I-3**). | Publishing | Immediate after verification |
-| 7 | Google Ads **manager account** (MCC) → **Admin → API Center** | Apply for a **developer token**. Use: "Third-party reporting tool, read-only, for advertisers' own accounts". Attach the design document (1c). Copy the token into `GOOGLE_ADS_DEVELOPER_TOKEN`. | **Developer token review** | A new token starts at Test level; Basic access review usually takes days to a few weeks |
-| 8 | Google Cloud Console → **IAM & Admin → Quotas** | Note the Ads API quota and the operations-per-day limit for the token's access level. | No | — |
-
-### 1b. What the sensitive-scope verification asks for
-
-- Why the app needs `adwords`: "Read campaign, conversion-action and click performance for accounts the user selects, and show it beside their website journeys. Xaylo makes no changes to Google Ads." Google Ads has no read-only OAuth scope, so the read-only limit is enforced by the app (Step 3, **I-1**).
-- A demo video (unlisted YouTube link) showing: the consent screen with the app name and scope, the account-selection screen, the data being displayed, and disconnecting.
-- A privacy policy that states what Google user data is read and stored, how to revoke access, and compliance with the Google API Services User Data Policy, including Limited Use.
-- No CASA security assessment is expected, because `adwords` is a sensitive scope rather than a restricted one. Confirm this during submission (**I-3**).
-
-### 1c. Developer token design document (short PDF)
-
-This covers: company and product summary; that the tool is reporting-only with no create or mutate features; the list of services and resources read (`GoogleAdsService.Search` over `customer`, `customer_client`, `campaign`, `ad_group`, `keyword_view`, `search_term_view`, `conversion_action`, `click_view`, plus `CustomerService.ListAccessibleCustomers`); estimated daily operations per workspace; screenshots of the Connections and Reports screens.
-
-### 1d. Code (small PR)
-
-- Treat `GOOGLE_ADS_DEVELOPER_TOKEN` as **required** whenever Google is enabled. Today the code treats it as optional (`src/google/client.ts:80`, **I-2**).
-- Add a `readiness` object to `GET /api/google`: `{ clientConfigured, developerTokenConfigured, projectConfigured, apiVersion }`. The Connections panel then lists the missing items in plain language.
-- Update `.env.example` and `.env.vm.example`, and link `docs/google-ads-setup.md` from the README.
-
-**Done when:** `npm run check` passes. With only the client ID set, the Connections panel shows "Developer token missing". The setup document lists every approval above.
+Start Step 1 first, because Google's reviews take days to weeks.
 
 ---
 
-## Step 2: One-click Google Ads connection
+## Step 1: Google Cloud access approvals and configuration checks
 
-**Goal:** Connecting Google Ads should take one click and one choice: **Connect → Google consent → choose a named account → done.**
+**Goal:** Get Xaylo's Google Cloud project approved for Google Ads API access. All of this is done **once, by Xaylo**; advertisers never see or handle any of it.
 
-- `POST /api/google/connect` opens Google in a **popup** instead of showing a "Continue to Google" link. The callback page (`src/google/routes.ts:186`) uses `postMessage({ type: 'xaylo:google-connected' })` to tell the opener, then closes itself. Its copy no longer says "Return to Xaylo in HighLevel" (**I-10**). If the popup is blocked, a normal link is shown instead.
-- After the consent callback, the dashboard calls account discovery automatically:
-  - `listAccessibleCustomers` returns only IDs, so run `SELECT customer.id, customer.descriptive_name, customer.manager, customer.currency_code, customer.time_zone FROM customer LIMIT 1` for each ID (capped at 25 and run in parallel). The user then sees names, not resource paths.
-  - Manager accounts expand automatically one level through `customer_client`, setting `login_customer_id`.
-- The UI shows a single list of advertising accounts: name, ID and currency, each with a **Use this account** button. If exactly one advertising account is found, it is pre-selected and needs one confirmation.
-- Manual entry of an account ID and manager ID moves under an **Advanced** disclosure.
-- The UI tip shown before connecting is: "Sign in with a Google user that has at least Read-only access to the Ads account."
+### How access works now
 
-**Files:** `src/google/client.ts` (`discoverAccounts`), `src/google/routes.ts`, `web/src/Connections.vue`.
-**Tests:** a mocked discovery that returns 2 direct accounts and 1 manager with 2 children produces 4 named advertising accounts and no managers. The callback HTML contains no HighLevel wording.
-**Done when:** a pilot user connects and selects an account without typing an ID.
+Google retired the Google Ads **developer token** on 9 September 2026, according to Google's developer-token page as quoted in search results and several 2026 guides. API access levels now belong to the **Google Cloud project**, which requests identify through the `x-goog-user-project` header. The existing client already sends that header (`src/google/client.ts:81`). A developer token that is still sent is ignored, and Google says a future API version will reject it. See **I-2**: the official page could not be fetched from this session, so check it before Step 1 is merged.
+
+| Access level | Daily operations | Accounts | How to get it |
+| --- | --- | --- | --- |
+| Test | 15,000 | Test accounts only | Default |
+| **Explorer** | **2,880** | Production | Request from the Google Ads API overview page in the Cloud Console; usually approved automatically. **Use this for the pilot.** |
+| **Basic** | **15,000** | Production | Apply in the Cloud Console; needs **brand verification** on the project. Apply for this before general launch. |
+| Standard | Unlimited | Production | Apply only after Basic; needed only at scale. |
+
+A weekly report uses about 30 operations per workspace, and the dashboard and MCP reads add some more. Explorer comfortably covers a pilot of roughly 50–100 active workspaces; Basic covers launch.
+
+### Console checklist (operator task, written up in `docs/google-ads-setup.md`)
+
+| # | Where | Action | Approval |
+| --- | --- | --- | --- |
+| 1 | Cloud Console → APIs & Services → Library | Enable **Google Ads API** on the production project. Set `GOOGLE_CLOUD_PROJECT`. | — |
+| 2 | Cloud Console → Google Ads API → Overview | Request **Explorer** access. | Usually automatic |
+| 3 | Google Search Console | Verify the production domain and the domain hosting the privacy policy. | Domain verification |
+| 4 | Google Auth Platform → Branding | User type External; app name, logo, support email, homepage, privacy policy and terms URLs; authorised domain. | **Brand verification** (about 2–3 business days) |
+| 5 | Google Auth Platform → Data Access | Add only `https://www.googleapis.com/auth/adwords`. | **Sensitive-scope verification**: scope justification and a demo video (**I-3**) |
+| 6 | Google Auth Platform → Clients | Create a Web client with redirect URI `https://YOUR_HOST/oauth/google/callback`. Set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`. | — |
+| 7 | Google Auth Platform → Audience | Keep the app in Testing for internal QA only, then publish **In production** after verification. While in Testing, refresh tokens expire after 7 days. | Publishing |
+| 8 | Cloud Console → Google Ads API → Overview | Once brand verification passes, apply for **Basic** access. Describe Xaylo as a read-only reporting tool for advertisers' own accounts. | Review |
+
+**Scope justification text:** "Xaylo reads campaign, conversion-action and click performance for the Google Ads accounts the user selects, and shows it beside their website routes. Xaylo performs read operations only and makes no changes to Google Ads." The demo video shows the consent screen, choosing an account, the data on screen, and disconnecting.
+
+### Code (small PR)
+
+- Stop sending `developer-token` and remove `GOOGLE_ADS_DEVELOPER_TOKEN` from the examples. While it still exists, log a one-time deprecation warning if it is set.
+- Make `GOOGLE_CLOUD_PROJECT` **required** when Google is enabled.
+- Add `readiness: { clientConfigured, projectConfigured, apiVersion }` to `GET /api/google`, so the Connections panel can explain what is missing.
+
+**Done when:** `npm run check` passes, and the readiness check flags a missing project ID.
+
+---
+
+## Step 2: One-click Google Ads connection and the re-approval pause
+
+**Goal:** The advertiser clicks **Connect Google Ads**, approves Google's screen, and is done. If Google later needs fresh approval, Xaylo pauses reports and offers the same single click to reconnect.
+
+### Connect
+
+- The button opens Google consent in a **popup**. The callback page calls `postMessage({ type: 'xaylo:google-connected' })` to tell the dashboard and closes itself. Its wording is fixed: it no longer mentions HighLevel (**I-10**). If the popup is blocked, a normal link is shown.
+- When the popup closes, the dashboard runs discovery automatically. It calls `listAccessibleCustomers`, looks up each account's name, currency, timezone and manager flag (at most 25 accounts), and expands manager accounts one level through `customer_client`.
+- **One advertising account found:** it is linked automatically. The panel shows "Linked: Acme Ltd · GBP" with a **Change** option.
+- **More than one:** a single list of named accounts, each with **Use this account**.
+- Manual account and manager ID entry moves under **Advanced**.
+
+### Connection health and the re-approval pause
+
+- Add `status` (`connected` | `needs_reauth`), `status_reason` and `status_changed_at` to `google_connections` (migration `006_google_status.sql`).
+- If a token refresh or an Ads call returns `invalid_grant`, or a 401/403 error showing revoked access or a lost account permission, set `needs_reauth`. Keep the selected account references, so reconnecting does not require choosing the account again when the same Google user approves.
+- While the status is `needs_reauth`:
+  - The dashboard shows a banner, **Google Ads needs re-approval · Reconnect**, which is the same one-click popup.
+  - **Report generation is paused** (enforced in Step 8). The 7-day timer does not count against the user: once they reconnect, the next report is available straight away if 7 days have passed.
+  - MCP Ads tools return "Google Ads needs re-approval in Xaylo → Connections".
+  - Measuring an action's result (Step 9) is paused for Ads-based metrics.
+- When reconnecting succeeds, the status returns to `connected`. If the new Google user cannot reach the previously selected account, the account picker is shown.
+
+**Files:** `src/google/client.ts`, `src/google/routes.ts`, `web/src/Connections.vue`, a banner in `web/src/App.vue`.
+**Tests:** discovery mock (2 direct accounts plus a manager with 2 children gives 4 named advertising accounts); `invalid_grant` sets `needs_reauth`; reconnecting keeps the account selection.
+**Done when:** a pilot user connects with one click and one approval, and revoking access in their Google account settings shows the banner and pauses reports.
 
 ---
 
 ## Step 3: Conversion- and click-focused Ads read model, with a read-only guard
 
-**Goal:** Read conversions and clicks per campaign and per conversion action. Make it structurally impossible to call Ads write endpoints.
+**Goal:** Read conversions and clicks per campaign and per conversion action, and make Ads write calls impossible.
 
-- Add a `conversionAction` level to `googleReport` (`src/google/reporting.ts`):
-  `SELECT campaign.id, campaign.name, segments.conversion_action, segments.conversion_action_name, segments.conversion_action_category, metrics.conversions, metrics.conversions_value, metrics.all_conversions FROM campaign WHERE segments.date BETWEEN … ORDER BY metrics.conversions DESC`.
-- Add `metrics.interactions` and `metrics.all_conversions` to the campaign level, and add `conversionRate = conversions / clicks` to `adsMetrics`.
-- Add a `listConversionActions` query (`conversion_action.id, name, category, status, primary_for_goal`) so reports can tell primary goals apart from secondary actions.
-- **Read-only guard:** `queryGoogle` and the discovery code may call only `…/googleAds:search` and `customers:listAccessibleCustomers`. Add an allowlist check in `src/google/client.ts`, and a unit test that fails if any other Ads URL path (`:mutate`, `/operations`) appears in `src/google/**`. All GAQL stays as fixed templates inside the server.
+- Add a `conversionAction` level to `googleReport`: `campaign.id, campaign.name, segments.conversion_action, segments.conversion_action_name, segments.conversion_action_category, metrics.conversions, metrics.conversions_value, metrics.all_conversions FROM campaign`.
+- Add `metrics.interactions` and `metrics.all_conversions` to the campaign level, and `conversionRate` to `adsMetrics`.
+- Add `listConversionActions` (`conversion_action.id, name, category, status, primary_for_goal`) so reports can tell primary goals apart from secondary actions.
+- **Read-only guard (I-1):** Ads requests may go only to `…/googleAds:search` and `customers:listAccessibleCustomers`. This is enforced in `src/google/client.ts`, with a test that fails if `:mutate`, `/operations` or any other Ads path appears under `src/google/**`. GAQL stays in fixed server-side templates.
 
-**Done when:** the new level returns per-action conversions from a mocked response, and the guard test passes.
+**Done when:** a mocked response gives conversions for each action, and the guard test passes.
 
 ---
 
-## Step 4: Linking Ads traffic to sessions and journeys
+## Step 4: Linking Ads traffic to sessions, routes and Xaylo Journeys
 
-**Goal:** Link each Google-sourced website session to an Ads campaign so conversions and clicks can be tied to journeys.
+**Goal:** Link each Google-sourced session to a campaign, so Ads conversions and clicks can be compared with routes and Xaylo Journeys.
 
 Each session is matched using the first method that applies, and each link is labelled with how it was made:
 
-1. `xaylo_campaign_id` on the landing URL (already captured). Method: `explicit`.
-2. `gclid` → campaign through a read-only **`click_view`** query (`click_view.gclid, campaign.id, ad_group.id WHERE segments.date = 'YYYY-MM-DD'`). `click_view` accepts one day per query, so run one query per day in the period. MVP periods are at most 7 days, so that is at most 7 queries. Matches are held in memory only (**I-9**, **I-12**). Method: `gclid`.
-3. The UTM campaign mapping already configured under Connections. Method: `utm_mapping`.
-4. `utm_source=google` with `utm_medium` in (`cpc`, `ppc`, `paid`) but no campaign. Method: `source_only`. This counts as Google paid traffic but has no campaign.
+1. `xaylo_campaign_id` on the landing URL. Method: `explicit`.
+2. `gclid` → campaign through a read-only `click_view` query, one query per day in the period (at most 7). Matches are held in memory only (**I-9**, **I-12**). Method: `gclid`.
+3. The UTM campaign mapping configured under Connections. Method: `utm_mapping`.
+4. `utm_source=google` with a paid medium but no campaign. Method: `source_only`.
 
-- New module `src/traffic/adsAssociation.ts` (a pure function plus a thin fetcher). Its output, per campaign: `{ campaignId, sessions, conversions, journeys: { [journeyId]: { sessions, conversions } }, methods: { explicit, gclid, utm_mapping } }`, plus coverage (the share of Google sessions linked to a campaign).
-- The existing `mappingCoverage` in `src/reporting/service.ts` is replaced by this module's coverage.
+New module `src/traffic/adsAssociation.ts`. Its output, per campaign: `{ campaignId, sessions, conversions, xayloJourneys: {id: {sessions, conversions}}, topRoutes[≤5], methods }`, plus coverage (the share of Google sessions linked to a campaign). It replaces the existing `mappingCoverage`.
 
-**Tests:** fixture events using each of the four methods; check the priority order and that no session is counted twice.
+**Tests:** fixtures for each of the four methods; priority order; no session counted twice.
 **Done when:** the overview shows "X% of Google sessions linked to a campaign (gclid Y%, explicit Z%)".
 
 ---
 
-## Step 5: Cleaned, journey-aware data pool
+## Step 5: Cleaned data pool
 
-**Goal:** One deterministic, bounded dataset used by the dashboard, the MCP tools and the AI, so every consumer sees the same numbers.
+**Goal:** One deterministic, bounded dataset used by the dashboard, the MCP tools and every AI provider.
 
-- New `src/reporting/dataPool.ts` → `buildDataPool(locationId, period)` returns:
-  - `site`: sessions, conversions, conversion rate, top landing pages (from `trafficSummary`).
-  - `journeys`: for each **configured journey** (`events.journey_id`): name, status, sessions, conversions, conversion rate, top sources, linked Ads campaigns. Sessions with no journey are grouped as "No journey".
-  - `sources`: per UTM source/medium/campaign: sessions, conversions, and whether the row is Google paid traffic.
-  - `ads`: account totals, the top 25 campaigns, the conversion-action breakdown, and linking coverage (from Steps 3–4).
-  - `crm`: the existing GHL aggregate summary (contacts, sources, tags, opportunity cohorts).
-  - `quality`: small-sample flags (fewer than 30 sessions), partial or truncated sources, currency and timezone notes, attribution coverage.
-- Cleaning rules (stated in code and in the docs): strip query strings from page URLs; lower-case and trim UTM values; merge `(direct)`, empty and `none` sources into `direct`; drop journeys with zero sessions from the evidence but keep them in the totals; cap every list at 25 rows; never include contact identities.
-- `evidenceSnapshot` reads from the data pool, giving stable evidence IDs such as `journey.<slug>`, `source.<n>`, `ads.campaign.<n>`, `ads.action.<n>` and `crm.summary`.
+`src/reporting/dataPool.ts` → `buildDataPool(locationId, period)` returns:
+
+- `site`: sessions, conversions, conversion rate, top landing pages.
+- `xayloJourneys`: for each configured journey: sessions, conversions, conversion rate, top sources, linked campaigns. Sessions with no journey are grouped as "No journey".
+- `routes`: the top 25 routes, each with its steps, sessions, conversion flag and loops.
+- `sources`: per UTM source/medium/campaign: sessions, conversions, and whether the row is Google paid traffic.
+- `ads`: totals, the top 25 campaigns, the conversion-action breakdown, linking coverage, and the connection status.
+- `crm`: the existing GHL aggregates.
+- `quality`: small samples, partial sources, currency and timezone notes, coverage.
+
+Cleaning rules: strip query strings from page URLs; lower-case and trim UTM values; merge empty, `none` and `(direct)` sources into `direct`; cap every list at 25 rows; never include contact identities. Evidence IDs are stable, for example `journey.<slug>`, `route.<n>`, `source.<n>`, `ads.campaign.<n>`, `ads.action.<n>`, `crm.summary`.
 
 **Done when:** `GET /api/analysis` returns the data pool, and a snapshot test pins its shape.
 
 ---
 
-## Step 6: MCP tools for journeys, sources, Ads and GHL
+## Step 6: MCP tools for journeys, routes, sources, Ads and GHL
 
-**Goal:** An assistant connected over MCP can understand journeys and traffic sources and read Ads and GHL data. Every tool here is read-only.
-
-New tools in `src/mcp/routes.ts`, each with `readOnlyHint: true` and `openWorldHint: false`, and each requiring the `reports:read` scope:
+Every tool here is read-only (`readOnlyHint: true`) and needs the `reports:read` scope.
 
 | Tool | Returns |
 | --- | --- |
-| `get_journeys` | Configured journeys: name, slug, status, priority, matching rules (UTM, path, referrer, tag), content summary. |
+| `get_xaylo_journeys` | Configured journeys: name, slug, status, priority, matching rules, content summary. |
 | `get_journey_performance` | `days`, optional `journeySlug` → sessions, conversions, sources and linked campaigns for each journey. |
-| `get_traffic_sources` | `days` → the UTM source/medium/campaign table, with Google paid traffic flagged. |
-| `get_google_ads_conversions` | `customerId`, `days` → conversions by campaign × conversion action, and primary vs secondary actions. |
-| `get_ads_traffic_association` | `customerId`, `days` → the Step 4 output and its coverage. |
-| `get_data_pool` | `days`, optional `customerId` → the full Step 5 dataset (the same input the AI receives). |
-| `get_current_action` | The open action from the latest report, its status and the metric it is tracked against (from Step 9). |
+| `get_routes` | `days` → the top routes, with conversion and exit points. |
+| `get_traffic_sources` | `days` → the UTM table, with Google paid traffic flagged. |
+| `get_google_ads_conversions` | `customerId`, `days` → conversions by campaign × conversion action. |
+| `get_ads_traffic_association` | `customerId`, `days` → the Step 4 output. |
+| `get_data_pool` | `days`, optional `customerId` → the full Step 5 dataset. |
+| `get_current_action` | The current action, its status, and its result once measured. |
+| `get_ai_status` | The chosen provider, model, whether it is ready, and the next report date. |
 
-- Keep the existing tools. `get_crm_summary` remains the GHL read tool, and its description is updated to name the GHL sources it reads.
-- Update the server `instructions` string so assistants know the order: `get_connected_accounts` → `get_data_pool` → drill down.
-- Update the tool list in `docs/reporting.md`.
+The existing tools stay; `get_crm_summary` remains the GHL read tool. Update the server's MCP `instructions` text with the suggested order: `get_connected_accounts` → `get_data_pool` → drill down. Update `docs/reporting.md`.
 
-**Tests:** each tool rejects a `customerId` the workspace has not selected; a grant with only `reports:read` cannot see `generate_marketing_report`.
-**Done when:** an MCP inspector session lists all the tools and gets valid JSON from each against the preview seed.
-
----
-
-## Step 7: Claude API key and provider switch
-
-**Goal:** Reports are generated with Claude, using either a workspace-supplied Claude API key or the server's key.
-
-- Replace the OpenAI Responses call in `src/reporting/ai.ts` with the official `@anthropic-ai/sdk`:
-  - `client.messages.create({ model, max_tokens: 16000, system: [...prompts], messages: [{ role: 'user', content: JSON.stringify(pool) }], output_config: { format: { type: 'json_schema', schema } } })` (structured outputs). Keep the existing Zod validation and the evidence-ID check after the call.
-  - Default model `claude-opus-5-5`, configurable with `AI_MODEL`. Use the `"default"` server-side refusal fallback, and handle `stop_reason: 'refusal'` and `'max_tokens'` with clear 502 messages.
-  - Env: `ANTHROPIC_API_KEY` (server fallback) replaces `OPENAI_API_KEY`. `aiConfigured` reports whether either a workspace key or the server key is available.
-- **Workspace key (bring your own key):** migration `006_ai_credentials.sql` adds `ai_credentials(location_id PK, provider, api_key_enc, last4, validated_at)`. The key is encrypted with the existing `ENCRYPTION_KEY`.
-  - `PUT /api/ai/key` validates the key with a cheap `client.models.list()` call before saving. `GET /api/ai/key` returns `{ configured, last4, validatedAt }` and never the key itself. `DELETE /api/ai/key` removes it.
-  - Connections gets an "AI provider" panel with a password-type field and a "Test & save" button.
-  - Order used: workspace key first, then the server key. The usage and audit record notes which one was used.
-- The MCP tool `get_ai_status` returns `{ configured, source: 'workspace' | 'server' | 'none', model }`. **The key itself is never accepted or returned through MCP** (**I-5**).
-- Prompt provenance (`promptVersion`) records `provider: 'anthropic'`.
-
-**Tests:** a mocked SDK checks that the response is parsed and validated; invalid evidence IDs are rejected; a saved key is never returned; with no key, the 503 message reads "Add a Claude API key in Connections".
-**Done when:** a preview workspace with a test key generates a report end to end.
+**Done when:** the MCP inspector lists every tool, each returns valid JSON on the preview seed, and an Ads account the workspace has not selected is rejected.
 
 ---
 
-## Step 8: Weekly single-action report
+## Step 7: AI provider choice: Xaylo AI, OpenAI or Claude
 
-**Goal:** Each report reads the whole data pool and gives the user exactly **one** action. A new report is available only after 7 days.
+**Goal:** The workspace chooses who runs its weekly report. Xaylo AI is the default and needs no setup.
 
-- **Prompt and schema** (`src/reporting/prompts.ts`, `src/reporting/ai.ts`; bump the prompt version):
+| Option (UI label) | Key | Model | Notes |
+| --- | --- | --- | --- |
+| **Xaylo AI** (default, included) | Xaylo's server key (`XAYLO_AI_API_KEY`) | A low-cost model: `claude-haiku-5-5` ($0.10 / $0.50 per million input/output tokens) | About $0.01 per report at the expected size of 20–30k input tokens. Can be switched to `claude-sonnet-5-5` for paid plans if testing shows better quality. |
+| **OpenAI (your key)** | The workspace's own OpenAI key | Chosen from an allowlist; defaults to the current `AI_MODEL` | Reuses the existing Responses API code in `src/reporting/ai.ts`. |
+| **Claude (your key)** | The workspace's own Anthropic key | Chosen from an allowlist (`claude-opus-5-5` by default, `claude-sonnet-5-5`, `claude-haiku-5-5`) | Official `@anthropic-ai/sdk`, with structured outputs through `output_config.format` and a server-side refusal fallback. |
+
+See **I-4** for why the labels name the provider rather than products such as "ChatGPT" or a specific model name.
+
+- **Provider interface** `src/reporting/providers/{index,xaylo,openai,anthropic}.ts`, each with `generate(input, schema) → analysis`. The shared Zod validation and evidence-ID check run after every provider. The output schema is the same for all of them.
+- **Keys:** migration `007_ai_settings.sql` adds `ai_settings(location_id PK, provider, model, api_key_enc, last4, validated_at)`.
+  - `PUT /api/ai/settings` validates a workspace's own key with a cheap model-list call, then stores it encrypted. `GET /api/ai/settings` never returns the key.
+  - Keys are entered only in the dashboard and **never through MCP**. The MCP tool `get_ai_status` returns only the provider and its status.
+- **UI:** an "AI provider" panel in Connections with three cards. Selecting OpenAI or Claude shows a password-type key field and a **Test & save** button.
+- **Failure handling:** if a workspace key fails (invalid key, out of credit or rate limited), the report is not consumed, and the user sees "Your OpenAI key was rejected — update it or switch to Xaylo AI".
+- The weekly cadence and plan rules apply whichever provider is chosen. Report provenance records the provider and model.
+
+**Tests:** each provider is mocked and checked against the same schema; invalid evidence is rejected; a saved key is never returned; a failed key releases the report reservation.
+**Done when:** the preview workspace generates a valid report with each of the three providers.
+
+---
+
+## Step 8: Weekly single-action report, trial and plan rules
+
+**Goal:** One report with one action, at most every 7 days, using the plan rules in [docs/pricing.md](pricing.md).
+
+- **Schema (prompt version bumped):**
   ```
   { summary, previousActionReview | null,
     action: { title, why, steps[≤5], effort: 'low'|'medium',
-              metric: { name, evidenceId, baseline, direction: 'increase'|'decrease' },
-              evidenceIds[≥1] },
+              metric: { name, evidenceId, baseline, direction }, evidenceIds[≥1] },
     dataQuality[] }
   ```
-  Prompt rules: choose the single change with the best ratio of evidence to effort; prefer low-risk changes (landing-page message, journey rules, negative keywords, conversion-tracking fixes) over budget increases; ground the action in a metric that the data pool can re-measure in 7 days; when evidence is thin, the action is to fix measurement.
-- **Cadence gate:** migration `007_report_cycles.sql` adds `report_cycles(id, location_id, report_id, created_at, next_available_at, action jsonb, action_status 'open'|'done'|'skipped', action_done_at, baseline jsonb, result jsonb)`.
-  - `reserveReport` refuses with 429 "Your next report is available on <date>" while `now() < next_available_at` (`created_at + 7 days`). This applies to the dashboard and to MCP `generate_marketing_report`.
-  - The reporting period is fixed at the **last 7 days** for this report type.
-  - `get_reporting_allowance` returns `nextReportAt`.
-- **Reports page:** one large card for the current action (title, why, steps, metric to watch) with **Mark as done** and **Skip** buttons, and a countdown to the next report. Older reports move into a collapsed history list.
-- Billing copy says "One focused report every 7 days". How this fits with the existing trial and monthly quota is in **I-6**.
+  Prompt rules: pick the single change with the best ratio of evidence to effort; prefer low-risk changes (landing-page message, Xaylo Journey rules, negative keywords, conversion-tracking fixes) over spend increases; choose a metric that can be re-measured within 7 days; when the evidence is weak, the action is to fix measurement.
+- **Cadence:** migration `008_report_cycles.sql` adds `report_cycles(id, location_id, report_id, created_at, next_available_at, action, action_status, action_done_at, baseline, result, paused_reason)`. `reserveReport` checks, in order:
+  1. A plan or trial that allows reports.
+  2. `now() ≥ next_available_at`; otherwise a 429 "Next report available on <date>".
+  3. **Paused** if a linked Google Ads connection is `needs_reauth`: a 409 "Reconnect Google Ads to resume reports". The pause does not push back the next report date.
+  4. The AI provider is ready.
+- The reporting period is fixed at the last 7 days. `get_reporting_allowance` returns `nextReportAt` and `pausedReason`.
+- **Plan rules** (replacing `PAID_REPORTS_PER_MONTH` and the one-report trial; see **I-6**): a 14-day trial gives two weekly reports, so the user sees the first action's result. Paid plans get one report every 7 days.
+- **Reports page:** a card for the current action with **Mark as done** and **Skip**, a countdown to the next report, any pause banner, and the history collapsed.
 
-**Done when:** two report requests 1 minute apart give one report and one 429; the report contains exactly one action whose `metric.evidenceId` exists in the data pool.
+**Done when:** a second request within 7 days is refused; a `needs_reauth` connection pauses generation; the report contains exactly one action, whose metric's evidence ID exists in the data pool.
 
 ---
 
 ## Step 9: Results of the last change
 
-**Goal:** Before the user can generate the next report, show what happened after the last action.
+- When the report is generated, store the action's baseline: the metric value and its supporting counts from the 7 days before the report.
+- **Mark as done** sets `action_done_at`, and the comparison window runs for 7 days from then. If the action is never marked done, the window starts at the report date and the result is labelled "not confirmed".
+- `computeActionResult(cycle)` re-runs `buildDataPool` for the comparison window and returns `{ before, after, change, changePct, directionMet, sampleWarning, caveats }`. It waits while Google Ads needs re-approval.
+- The Reports page shows a **Result of your last change** card above the generate button, or "Measuring… results on <date>" until the window ends.
+- The next report's input includes `previousAction` and `previousResult`, and the AI fills in `previousActionReview` first.
+- These saved results are the start of the ROI history that later paid tiers build on (see [docs/pricing.md](pricing.md)).
 
-- When the action is generated, store its baseline: the metric value and supporting counts (for example, sessions and conversions) from the 7-day window before the report.
-- When the user marks the action **done**, record `action_done_at`. The comparison window then runs from `action_done_at` for 7 days. If the user never marks it done, the window starts at `created_at` and the result is labelled "action not confirmed".
-- `computeActionResult(cycle)` (a pure function) re-runs `buildDataPool` for the comparison window, finds the same evidence path, and returns `{ before, after, change, changePct, direction met?, sampleWarning, caveats }`. Caveats include Ads conversion lag and seasonality (**I-7**).
-- The **Reports** page shows a "Result of your last change" card above the generate button once the comparison window ends. Until then it shows "Measuring… results on <date>".
-- The next report's prompt input includes `previousAction` and `previousResult`, and the AI must fill in `previousActionReview` first.
-- MCP `get_current_action` returns the cycle together with its result.
-
-**Tests:** fixtures with the conversion rate going from 2% to 3% give `change = +1pt` with `direction met = true`; under 30 sessions sets `sampleWarning`.
-**Done when:** the end-to-end flow (report → mark done → 7 days pass → result card → next report) works with a mocked clock.
+**Tests:** a conversion rate going from 2% to 3% gives `+1pt` with the direction met; under 30 sessions sets `sampleWarning`; an Ads metric is paused while the connection is `needs_reauth`.
+**Done when:** the full cycle (report → done → result → next report) works end to end with a mocked clock.
 
 ---
 
-## Step 10: Rings view and switching to the journey topology view
+## Step 10: Rings view and the route map
 
-**Goal:** The primary Overview is a website-wide **rings** view of all traffic. Selecting a single journey switches to the existing topology (roads) view for that journey. Both views share the same visual language.
+**Goal:** The rings view is the primary Overview of all site traffic. Selecting a single route switches to the route map (the current topology view).
 
-- **New `web/src/components/RingsBoard.vue`**, reusing the geometry in `Dartboard.vue` (`center`, `ringRadius`, the bullseye, glow filters):
-  - Draw concentric ring guides only. Remove the decorative segments (`decoWedges` and `decoBand` in `Dartboard.vue`).
-  - Ring = step depth from entry (ring 1 = landing pages, the bullseye = conversion). Page nodes sit on their ring and are sized by sessions.
-  - All traffic is visible: aggregate flows between rings are thin radial strokes (no two-way roads). Node colour shows the leading source group (Google paid / organic / direct / referral / other), with a legend.
-  - Hover shows page sessions, conversions and source mix. Clicking a node highlights the journeys that pass through it.
-- **New `web/src/OverviewView.vue`** coordinates the two views:
-  - State `mode: 'rings' | 'journey'` and `selectedJourney`.
-  - The journey list (configured journeys plus "All traffic") sits beside the rings. Choosing a journey sets `mode = 'journey'` and renders the existing `TrafficView` with the traffic filtered to that journey's sessions. A **← All traffic** control returns to the rings view.
-  - Shared header statistics and a short cross-fade transition so the switch feels like zooming in.
-- **Data:** `GET /api/traffic?days=…&journey=<id>` filters by `events.journey_id`. The rings view uses a server-side aggregation (`src/traffic/aggregate.ts` → `ringsDataset`) so the browser never receives raw sessions (**I-15**).
-- `App.vue` renders `OverviewView` instead of `TrafficView` directly.
+- **Rename** "journeys" to **routes** in `PathList.vue`, `TrafficView.vue`, the captions and the tooltips. "Journey" now means only Xaylo Journeys.
+- **`web/src/components/RingsBoard.vue`** reuses the geometry in `Dartboard.vue` (`center`, `ringRadius`, the bullseye, the glow filters) without `decoWedges` or `decoBand`:
+  - Each ring is a step depth from entry: ring 1 holds landing pages, and the bullseye is conversion. Nodes are sized by sessions and coloured by their main source group (Google paid / organic / direct / referral / other), with a legend.
+  - All traffic is shown as thin aggregate flows between rings. There are no two-way roads in this view.
+  - Hovering a node shows its sessions, conversions and source mix, and highlights the routes through it.
+- **`web/src/OverviewView.vue`:**
+  - `mode: 'rings' | 'route'`, `selectedRoute`, `journeyFilter`.
+  - The rings view sits beside a list of the top **routes**. Choosing a route switches to `TrafficView` (the route map) with that route selected and highlighted. **← All traffic** returns to the rings view.
+  - A **Xaylo Journey** filter (All, plus each journey) applies to both views.
+  - Shared header statistics and a cross-fade, so the switch feels like zooming in.
+- **Data:** `GET /api/traffic?days=…&journey=<id>` filters by `journey_id`. A new server-side `ringsDataset` sends aggregates, not raw sessions (**I-15**).
+- `App.vue` renders `OverviewView`.
 
-**Tests:** extend `test/dartboard.test.ts`: the rings model puts landing pages on ring 1 and has no segment data; filtering by journey ID returns only that journey's sessions.
-**Done when:** the preview seed shows the rings view by default, selecting a journey opens the roads view for that journey only, and "All traffic" returns.
+**Tests:** in the rings model, landing pages are on ring 1 and there is no segment data; the journey filter returns only that journey's sessions; selecting a route switches the mode.
+**Done when:** the preview opens on the rings view, choosing a route opens the route map, the journey filter works in both views, and **All traffic** returns to the rings view.
 
 ---
 
-## Release checklist (after Step 10)
+## Release checklist
 
 - `npm run check` and the database integration tests pass.
-- Google: the OAuth app is **In production** and verified; the developer token has **Basic** access or higher; a live test account has been read for every Ads level.
-- A Claude key has been tested in both modes (workspace key and server key).
-- The weekly gate and the before/after result have been checked on a staging workspace with a shifted clock.
-- `docs/reporting.md`, `README.md` and the public guide are updated: AI provider, cadence, MCP tools, and the Google setup link.
+- Google: the consent screen is verified and In production; the Cloud project has **Basic** access; every Ads level has been read on a live account; revoking access shows the re-approval pause.
+- All three AI providers produce valid reports on staging.
+- The weekly gate, the pause and the before/after result have been checked with a shifted clock.
+- The docs, the public guide and the pricing page are updated.
