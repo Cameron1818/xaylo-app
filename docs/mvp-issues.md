@@ -1,5 +1,7 @@
 # MVP issues and open decisions
 
+Statistical-accuracy findings (R-1 to R-10) are listed separately in [the MCP and reporting review](mcp-review.md).
+
 This file lists the issues raised while scoping [the MVP plan](mvp-plan.md) and [the pricing proposal](pricing.md). Items marked **Decision** need a product owner's answer before the step they affect starts. Resolved items are kept as a record of what was decided.
 
 | ID | Status | Step | Summary |
