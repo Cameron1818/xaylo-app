@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useTrafficData } from './composables/useTrafficData'
-import JourneyMap from './components/JourneyMap.vue'
+import RouteMap from './components/RouteMap.vue'
 import PathList from './components/PathList.vue'
 import Filters from './components/Filters.vue'
 import Tooltip from './components/Tooltip.vue'
@@ -171,7 +171,7 @@ const topPage = computed(() => [...nodes.value].sort((a, b) => b.weight - a.weig
 
     <main class="app-main">
       <div class="board-wrap">
-        <div class="map-heading"><div><h2>Visitor journeys</h2><p>Follow the paths from your website pages to conversion.</p></div></div>
+        <div class="map-heading"><div><h2>Visitor routes</h2><p>Follow the paths from your website pages to conversion.</p></div></div>
         <div class="board-legend">
           <span><i class="primary-key"></i> Main routes</span>
           <span><i class="alternative-key"></i> Alternative & return routes</span>
@@ -179,7 +179,7 @@ const topPage = computed(() => [...nodes.value].sort((a, b) => b.weight - a.weig
           <span v-if="!showReturnTraffic">First visits only</span>
           <span><i class="exit-key"></i> Exit branch</span>
         </div>
-        <JourneyMap
+        <RouteMap
           :nodes="nodes"
           :edges="edges"
           :roads="roads"

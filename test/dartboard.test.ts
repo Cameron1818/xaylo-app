@@ -20,14 +20,14 @@ test('live traffic can be rendered by the journey map model', () => {
   assert.ok(model.edges.value.every(edge => !/NaN|Infinity/.test(edge.d)));
 });
 
-test('journey positions stay fixed when filtering and return routes remain drawable', () => {
+test('route positions stay fixed when filtering and return routes remain drawable', () => {
   const traffic = { defaultGoal: 'goal', pages: [{ id: 'home', label: 'Home', isEntry: true }, { id: 'services', label: 'Services' }, { id: 'pricing', label: 'Pricing' }, { id: 'about', label: 'About' }, { id: 'goal', label: 'Conversion', isConversion: true }],
     paths: [{ steps: ['home', 'services', 'pricing', 'services', 'pricing', 'goal'], sessions: 20 }, { steps: ['home', 'about'], sessions: 5 }] };
   const model = useTrafficData(traffic);
   const original = new Map(model.nodes.value.map(node => [node.id, { x: node.x, y: node.y }]));
   assert.ok(model.edges.value.some(edge => edge.revisitTraversals > 0));
   assert.ok(model.roads.value.some(road => road.lanes.length === 2));
-  model.journeyType.value = 'converted';
+  model.routeType.value = 'converted';
   for (const node of model.nodes.value) assert.deepEqual({ x: node.x, y: node.y }, original.get(node.id));
   assert.equal(model.totalSessions.value, 25);
   assert.equal(model.visibleSessions.value, 20);
@@ -36,7 +36,7 @@ test('journey positions stay fixed when filtering and return routes remain drawa
   assert.ok(model.edges.value.every(edge => !/NaN|Infinity/.test(edge.d)));
 });
 
-test('journey map handles self-loops and journeys without a conversion', () => {
+test('route map handles self-loops and routes without a conversion', () => {
   const model = useTrafficData({ defaultGoal: 'goal', pages: [{ id: 'home', label: 'Home', isEntry: true }, { id: 'about', label: 'About' }, { id: 'goal', label: 'Conversion', isConversion: true }],
     paths: [{ steps: ['home', 'home', 'about'], sessions: 3 }] });
   assert.equal(model.convertedSessions.value, 0);

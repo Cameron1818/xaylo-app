@@ -1,6 +1,6 @@
 // Positions come from the full graph so filters never move a page underneath
 // the pointer. Distance from the goal places conversion toward the right.
-export function buildJourneyLayout(pages, graph, layout, goalId) {
+export function buildRouteLayout(pages, graph, layout, goalId) {
   const maxDistance = Math.max(1, ...layout.ring.values())
   const width = Math.max(900, maxDistance * 175 + 180)
   const columns = new Map()

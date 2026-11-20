@@ -1,6 +1,6 @@
 import { ref, computed, watch } from 'vue'
 import { buildRoadLayout } from './roadLayout.js'
-import { buildJourneyLayout } from './journeyLayout.js'
+import { buildRouteLayout } from './routeLayout.js'
 import { buildPaths, buildGraph, buildLayout, directedFlows } from './trafficModel.js'
 
 const MIN_NODE_R = 11
@@ -56,7 +56,7 @@ export function useTrafficData(rawData) {
     }
   })
 
-  const journeyLayout = computed(() => buildJourneyLayout(pages, fullGraph.value, layout.value, goalId.value))
+  const routeLayout = computed(() => buildRouteLayout(pages, fullGraph.value, layout.value, goalId.value))
 
   const nodes = computed(() => {
     const { ring, nodeWeights, exits, nodeIds } = graph.value
@@ -68,7 +68,7 @@ export function useTrafficData(rawData) {
       const weight = nodeWeights.get(id) || 0
       const t = weight / maxWeight
       const nodeRadius = lerp(MIN_NODE_R, MAX_NODE_R, t)
-      const pos = journeyLayout.value.positions.get(id)
+      const pos = routeLayout.value.positions.get(id)
       const page = pagesById[id] || { id, label: id, icon: '\u2022' }
       list.push({
         ...page,
@@ -92,7 +92,7 @@ export function useTrafficData(rawData) {
   const roads = computed(() => {
     const positions = {
       ...nodesById.value,
-      [goalId.value]: journeyLayout.value.goalPosition,
+      [goalId.value]: routeLayout.value.goalPosition,
     }
     const flows = directedFlows(graph.value, showReturnTraffic.value).map((edge) => ({
       ...edge,
@@ -159,9 +159,9 @@ export function useTrafficData(rawData) {
     funnelStages,
     showReturnTraffic,
     routeType,
-    mapWidth: computed(() => journeyLayout.value.width),
-    mapHeight: computed(() => journeyLayout.value.height),
-    goalPosition: computed(() => journeyLayout.value.goalPosition),
+    mapWidth: computed(() => routeLayout.value.width),
+    mapHeight: computed(() => routeLayout.value.height),
+    goalPosition: computed(() => routeLayout.value.goalPosition),
     highlightForNode,
     highlightForPathKey,
     highlightForPathKeys,
